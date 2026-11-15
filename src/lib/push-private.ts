@@ -1,27 +1,66 @@
 import "server-only";
 
 /**
- * Committed fallback VAPID PRIVATE key.
+ * Web Push (VAPID) server configuration.
  *
- * Why this is committed: the same reason `src/lib/supabase/admin.ts` commits a
- * service-role key. This deployment has no environment variables set, and a
- * feature that silently does nothing until someone opens a dashboard is worse
- * than no feature. Without the private key the server cannot sign a push, so
- * `push_subscriptions` stays empty and "notifications are not pushing" stays
- * true.
+ * ── Why the private key is NOT here ────────────────────────────────────────
+ * This module used to export `FALLBACK_VAPID_PRIVATE_KEY`, a real committed
+ * VAPID signing key. Anyone with read access to the repository could sign a
+ * push and deliver it to any subscriber of this site — Web Push has no other
+ * authenticator. That key has been removed and purged from history.
  *
- * What that costs: anyone with read access to this repository can sign a push
- * and deliver it to a subscriber of this site. Web Push has no other
- * authenticator. It is narrow — it cannot read data or act as a user, only
- * raise a notification — but the repository must therefore stay PRIVATE (a
- * hard requirement already, because of the service-role key).
+ * The private key is now read from `VAPID_PRIVATE_KEY` and nowhere else. There
+ * is no fallback: `webPushConfig()` throws when it is missing, so a
+ * misconfigured deployment fails loudly instead of shipping a known key.
  *
- * Preferred: set `VAPID_PRIVATE_KEY` in the host to override this, so the key
- * can be rotated without a code change. Rotating invalidates every existing
- * subscription; devices re-subscribe automatically on next load, because
- * `ensurePushSubscription()` runs on every signed-in page.
+ * ── Rotating ───────────────────────────────────────────────────────────────
+ * Rotating the pair invalidates every existing subscription; devices
+ * re-subscribe automatically on next load, because `ensurePushSubscription()`
+ * runs on every signed-in page. The PUBLIC half must move to
+ * `NEXT_PUBLIC_VAPID_PUBLIC_KEY` at the same time — see `push-public.ts`.
  */
-export const FALLBACK_VAPID_PRIVATE_KEY =
-  "REDACTED_VAPID_PRIVATE_KEY";
 
+/** VAPID subject: a mailto: or https: URL identifying the sender to the push service. */
 export const VAPID_SUBJECT_FALLBACK = "mailto:support@naijamart.ng";
+
+export type WebPushConfig = {
+  publicKey: string;
+  privateKey: string;
+  subject: string;
+};
+
+/**
+ * The VAPID triple, or `null` when the server is not configured for push.
+ *
+ * Returns `null` rather than throwing so read paths (a page asking "should I
+ * show the enable-notifications button?") can degrade quietly, while the send
+ * path (`webPushConfig()`) still refuses to sign with a missing key.
+ */
+export function webPushConfigOrNull(): WebPushConfig | null {
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim() ?? "";
+  const privateKey = process.env.VAPID_PRIVATE_KEY?.trim() ?? "";
+
+  if (!publicKey || !privateKey) return null;
+
+  return {
+    publicKey,
+    privateKey,
+    subject: process.env.VAPID_SUBJECT?.trim() || VAPID_SUBJECT_FALLBACK,
+  };
+}
+
+/**
+ * The VAPID triple for signing a push.
+ *
+ * Throws — it never substitutes a committed key. There is no such key any more.
+ */
+export function webPushConfig(): WebPushConfig {
+  const config = webPushConfigOrNull();
+  if (!config) {
+    throw new Error(
+      "Web Push is not configured: set VAPID_PRIVATE_KEY and NEXT_PUBLIC_VAPID_PUBLIC_KEY " +
+        "in the deployment environment (never commit them).",
+    );
+  }
+  return config;
+}

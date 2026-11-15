@@ -7,7 +7,7 @@
  * holds a privileged key. Each action returns a plain `{ ok, error }` result
  * instead of throwing, because the calling components render the message inline.
  *
- * ── Why every action opens with `requireAdmin()` ──────────────────────────
+ * ── Why every action opens with `requireAdmin()` ───────────────────────────
  * The console's pages are gated by middleware, but a Server Action is its own
  * HTTP endpoint: it can be invoked directly, without ever rendering the page
  * that contains the button. Gating only the page protects the view and not the
@@ -15,15 +15,26 @@
  * and change platform settings. So each action re-checks the `admin_users` row
  * itself, through the same helper the middleware uses.
  *
- * ── Why the service role ─────────────────────────────────────────────────
- * The `admin_*` RPCs open with `if not public.is_admin()`, and a server action
- * has no `auth.uid()`. The key itself is the authorisation, and it never
- * reaches the browser. The RPCs are still used where they carry real business
- * logic — they are just invoked server-side, where `is_admin()` returns false.
- * So each action below either calls the RPC through a client that is allowed
- * to bypass that guard, or performs the equivalent write directly. For the
- * RPCs guarded by `is_admin()`, direct writes are used and the business rules
- * they enforced are reproduced explicitly.
+ * ── The database is the single source of truth for the rules ───────────────
+ * This file used to re-implement, in TypeScript, the business rules of
+ * `admin_verify_payment`, `admin_resolve_dispute`, `admin_mark_payout_paid`,
+ * `admin_set_shop_status`, `admin_save_payment_account` and
+ * `admin_delete_payment_account` — because those RPCs open with
+ * `if not public.is_admin()` and a Server Action has no `auth.uid()`.
+ *
+ * Two copies of the same rules drift, and they had: the TS copy of
+ * `admin_resolve_dispute` hardcoded a one-day payout hold while SQL used
+ * `payout_hold_days`, and the TS copy of `admin_verify_payment` cancelled the
+ * order and notified the buyer on rejection while SQL only restored stock.
+ *
+ * `sql/0043_admin_rpc_single_source_of_truth.sql` fixes the guard instead:
+ * `is_admin()` now also accepts a caller authenticated as `service_role`
+ * (which a browser cannot forge — PostgREST reads the role from the verified
+ * JWT). So every action below simply calls the RPC. The rules live in one
+ * place, and a change to them is a migration, not a code change in two files.
+ *
+ * `p_actor` is passed for the audit columns only (`verified_by`,
+ * `resolved_by`). It is never used for authorisation.
  */
 import { revalidatePath } from "next/cache";
 import { createAdminClient, hasAdminKey } from "@/lib/supabase/admin";
@@ -62,9 +73,14 @@ function refreshAdmin(extra?: string[]) {
   }
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────────────────────────
  * Payments — verify or reject a buyer's transfer receipt (the escrow gate)
- * ────────────────────────────────────────────────────────────────────────── */
+ *
+ * All of it — the "already verified" check, the stock release, cancelling the
+ * unpaid order, the buyer notification, the subscription window, the seller
+ * notification — is `admin_verify_payment` in SQL. This action only authorises
+ * and forwards.
+ * ──────────────────────────────────────────────────────────────────────────── */
 export async function verifyPayment(
   paymentId: string,
   approve: boolean,
@@ -80,161 +96,17 @@ export async function verifyPayment(
   try {
     const supabase = createAdminClient();
 
-    const { data: pay, error: payErr } = await supabase
-      .from("payments")
-      .select("id,type,order_id,shop_id,status,amount")
-      .eq("id", paymentId)
-      .maybeSingle();
-    if (payErr) return fail(payErr);
-    if (!pay) return { ok: false, error: "Payment not found." };
-    if (pay.status === "verified") {
-      return { ok: false, error: "That payment is already verified." };
-    }
-
-    /* ── Reject ─────────────────────────────────────────────────────────── */
-    if (!approve) {
-      const { error } = await supabase
-        .from("payments")
-        .update({
-          status: "rejected",
-          reject_reason: reason!.trim(),
-          verified_at: new Date().toISOString(),
-        })
-        .eq("id", paymentId);
-      if (error) return fail(error);
-
-      // Give back reserved stock on an unpaid order.
-      if (pay.type === "order" && pay.order_id) {
-        const { data: order } = await supabase
-          .from("orders")
-          .select("id,status,buyer_id,reference,shop_id")
-          .eq("id", pay.order_id)
-          .maybeSingle();
-
-        /*
-         * A denied receipt has to end the order, not just the payment.
-         *
-         * Before this, the payment flipped to `rejected` and the order stayed
-         * `pending_payment` forever: the buyer's tracking page still showed
-         * "waiting for payment" with an upload button, the seller still saw it
-         * as live, and the admin console kept it in the pending queue. The
-         * three views disagreed about the same order.
-         *
-         * Cancelling here makes all three agree, and the buyer is told why.
-         */
-        if (order && order.status === "pending_payment") {
-          await supabase
-            .from("orders")
-            .update({
-              status: "cancelled",
-              decline_reason: reason!.trim(),
-              payout_status: "held",
-            })
-            .eq("id", order.id);
-
-          if (order.buyer_id) {
-            await supabase.from("notifications").insert({
-              user_id: order.buyer_id,
-              kind: "order" as const,
-              title: "Payment not verified",
-              body: `We could not verify your payment for ${order.reference}. Reason: ${reason!.trim()}. The order has been cancelled — you can place it again with a valid receipt.`,
-              href: `/orders/${order.id}`,
-              order_id: order.id,
-            });
-          }
-        }
-
-        if (order?.status === "pending_payment") {
-          const { data: items } = await supabase
-            .from("order_items")
-            .select("listing_id,quantity")
-            .eq("order_id", pay.order_id);
-
-          for (const item of items ?? []) {
-            if (!item.listing_id) continue;
-            const { data: listing } = await supabase
-              .from("listings")
-              .select("id,stock,status,type")
-              .eq("id", item.listing_id)
-              .maybeSingle();
-            if (!listing || listing.type !== "product") continue;
-
-            await supabase
-              .from("listings")
-              .update({
-                stock: Number(listing.stock) + Number(item.quantity),
-                status: listing.status === "out_of_stock" ? "live" : listing.status,
-              })
-              .eq("id", listing.id);
-          }
-        }
-      }
-
-      // A rejected subscription receipt means the shop is not paid up.
-      if (pay.type === "subscription" && pay.shop_id) {
-        await supabase
-          .from("shops")
-          .update({ subscription_status: "expired" })
-          .eq("id", pay.shop_id);
-      }
-
-      refreshAdmin();
-      return { ok: true };
-    }
-
-    /* ── Approve ────────────────────────────────────────────────────────── */
-    const { error: verifyErr } = await supabase
-      .from("payments")
-      .update({
-        status: "verified",
-        verified_at: new Date().toISOString(),
-        reject_reason: null,
-      })
-      .eq("id", paymentId);
-    if (verifyErr) return fail(verifyErr);
-
-    if (pay.type === "order" && pay.order_id) {
-      const { data: order } = await supabase
-        .from("orders")
-        .select("id,status,total,commission_amount,payout_amount,shop_id")
-        .eq("id", pay.order_id)
-        .maybeSingle();
-
-      if (order && order.status === "pending_payment") {
-        const autoCancel = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-        await supabase
-          .from("orders")
-          .update({ status: "paid", auto_cancel_at: autoCancel })
-          .eq("id", order.id);
-      }
-    }
-
-    if (pay.type === "subscription" && pay.shop_id) {
-      const { data: shop } = await supabase
-        .from("shops")
-        .select("id,subscription_expires_at")
-        .eq("id", pay.shop_id)
-        .maybeSingle();
-
-      const base =
-        shop?.subscription_expires_at && new Date(shop.subscription_expires_at) > new Date()
-          ? new Date(shop.subscription_expires_at)
-          : new Date();
-      base.setMonth(base.getMonth() + 1);
-
-      await supabase
-        .from("shops")
-        .update({
-          subscription_status: "active",
-          subscription_expires_at: base.toISOString(),
-        })
-        .eq("id", pay.shop_id);
-    }
+    const { error } = await supabase.rpc("admin_verify_payment", {
+      p_payment_id: paymentId,
+      p_approve: approve,
+      p_reason: approve ? null : reason!.trim(),
+      p_actor: admin.userId,
+    });
+    if (error) return fail(error);
 
     // A verified subscription changes what the SELLER sees, not just the
-    // admin. Without these two paths the seller's subscription page kept
-    // serving its cached render and still showed the old plan/status until
-    // the cache happened to expire.
+    // admin. Without these paths the seller's subscription page kept serving
+    // its cached render and still showed the old plan/status.
     refreshAdmin(["/seller/subscription", "/seller/analytics", "/seller"]);
     return { ok: true };
   } catch (error) {
@@ -242,9 +114,9 @@ export async function verifyPayment(
   }
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────────────────────────
  * Payouts
- * ────────────────────────────────────────────────────────────────────────── */
+ * ──────────────────────────────────────────────────────────────────────────── */
 export async function markPayoutPaid(
   payoutId: string,
   reference?: string,
@@ -256,33 +128,12 @@ export async function markPayoutPaid(
   try {
     const supabase = createAdminClient();
 
-    const { data: payout, error: findErr } = await supabase
-      .from("payouts")
-      .select("id,status,order_id")
-      .eq("id", payoutId)
-      .maybeSingle();
-    if (findErr) return fail(findErr);
-    if (!payout) return { ok: false, error: "Payout not found." };
-    if (payout.status !== "queued") {
-      return { ok: false, error: "Payout not found or already paid." };
-    }
-
-    const ref =
-      reference?.trim() ||
-      `PO-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-
-    const { error } = await supabase
-      .from("payouts")
-      .update({ status: "paid", paid_at: new Date().toISOString(), reference: ref })
-      .eq("id", payoutId);
+    const { error } = await supabase.rpc("admin_mark_payout_paid", {
+      p_payout_id: payoutId,
+      p_reference: reference?.trim() || null,
+      p_actor: admin.userId,
+    });
     if (error) return fail(error);
-
-    if (payout.order_id) {
-      await supabase
-        .from("orders")
-        .update({ payout_status: "paid" })
-        .eq("id", payout.order_id);
-    }
 
     refreshAdmin();
     return { ok: true };
@@ -291,9 +142,13 @@ export async function markPayoutPaid(
   }
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────────────────────────
  * Disputes
- * ────────────────────────────────────────────────────────────────────────── */
+ *
+ * The payout hold (`payout_hold_days`) and the buyer/seller branches are
+ * `admin_resolve_dispute` in SQL — including the hold that the TS copy used to
+ * hardcode to one day.
+ * ──────────────────────────────────────────────────────────────────────────── */
 export async function resolveDispute(
   disputeId: string,
   outcome: "resolved_buyer" | "resolved_seller",
@@ -309,72 +164,13 @@ export async function resolveDispute(
   try {
     const supabase = createAdminClient();
 
-    const { data: dispute, error: findErr } = await supabase
-      .from("disputes")
-      .select("id,order_id")
-      .eq("id", disputeId)
-      .maybeSingle();
-    if (findErr) return fail(findErr);
-    if (!dispute) return { ok: false, error: "Dispute not found." };
-
-    const { data: order, error: orderErr } = await supabase
-      .from("orders")
-      .select("id,shop_id,total,commission_amount,payout_amount")
-      .eq("id", dispute.order_id)
-      .maybeSingle();
-    if (orderErr) return fail(orderErr);
-    if (!order) return { ok: false, error: "The disputed order is missing." };
-
-    const { error } = await supabase
-      .from("disputes")
-      .update({
-        status: outcome,
-        resolution_note: note.trim(),
-        resolved_at: new Date().toISOString(),
-      })
-      .eq("id", disputeId);
+    const { error } = await supabase.rpc("admin_resolve_dispute", {
+      p_dispute_id: disputeId,
+      p_outcome: outcome,
+      p_note: note.trim(),
+      p_actor: admin.userId,
+    });
     if (error) return fail(error);
-
-    if (outcome === "resolved_buyer") {
-      // Buyer wins: the money is held, not released, and any queued payout dies.
-      await supabase
-        .from("orders")
-        .update({ status: "cancelled", payout_status: "held" })
-        .eq("id", order.id);
-      await supabase
-        .from("payouts")
-        .delete()
-        .eq("order_id", order.id)
-        .eq("status", "queued");
-    } else {
-      // Seller wins: treat as delivered and queue the payout.
-      await supabase
-        .from("orders")
-        .update({ status: "delivered", payout_status: "released" })
-        .eq("id", order.id);
-
-      // The hold matches `payout_hold_days` in platform_settings — the same
-      // rule admin_resolve_dispute applies in SQL. It used to be hardcoded to
-      // one day here, which quietly paid a seller three days earlier than the
-      // platform allows every other release path.
-      const { data: settings } = await supabase
-        .from("platform_settings")
-        .select("payout_hold_days")
-        .eq("id", 1)
-        .maybeSingle();
-      const holdDays = Number(settings?.payout_hold_days ?? 4);
-      const availableAt = new Date(Date.now() + holdDays * 24 * 60 * 60 * 1000).toISOString();
-      await supabase.from("payouts").insert({
-        shop_id: order.shop_id,
-        order_id: order.id,
-        amount: order.payout_amount,
-        gross_amount: order.total,
-        commission_amount: order.commission_amount,
-        kind: "order",
-        status: "queued",
-        available_at: availableAt,
-      });
-    }
 
     refreshAdmin();
     return { ok: true };
@@ -383,9 +179,12 @@ export async function resolveDispute(
   }
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────────────────────────
  * Sellers
- * ────────────────────────────────────────────────────────────────────────── */
+ *
+ * Approving publishes hidden listings and grants the new-seller boost;
+ * suspending/rejecting hides live listings. That is `admin_set_shop_status`.
+ * ──────────────────────────────────────────────────────────────────────────── */
 export async function setShopStatus(
   shopId: string,
   status: "pending" | "approved" | "suspended" | "rejected",
@@ -402,41 +201,14 @@ export async function setShopStatus(
   try {
     const supabase = createAdminClient();
 
-    const patch: Record<string, unknown> = {
-      status,
-      review_note: note?.trim() || null,
-    };
-    if (typeof verified === "boolean") patch.verified = verified;
-
-    const { error } = await supabase.from("shops").update(patch).eq("id", shopId);
+    const { error } = await supabase.rpc("admin_set_shop_status", {
+      p_shop_id: shopId,
+      p_status: status,
+      p_note: note?.trim() || null,
+      p_verified: typeof verified === "boolean" ? verified : null,
+      p_actor: admin.userId,
+    });
     if (error) return fail(error);
-
-    if (status === "approved") {
-      // Publish hidden listings and give the shop its new-seller boost.
-      await supabase
-        .from("listings")
-        .update({ status: "live" })
-        .eq("shop_id", shopId)
-        .eq("status", "hidden");
-
-      const boostUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-      const { error: scoreErr } = await supabase
-        .from("seller_scores")
-        .upsert(
-          { shop_id: shopId, new_seller_boost_until: boostUntil },
-          { onConflict: "shop_id" },
-        );
-      // A missing scores table must not fail the approval itself.
-      if (scoreErr) console.error("[admin] seller_scores upsert failed:", scoreErr.message);
-    }
-
-    if (status === "suspended" || status === "rejected") {
-      await supabase
-        .from("listings")
-        .update({ status: "hidden" })
-        .eq("shop_id", shopId)
-        .eq("status", "live");
-    }
 
     refreshAdmin();
     return { ok: true };
@@ -445,6 +217,12 @@ export async function setShopStatus(
   }
 }
 
+/**
+ * Suspend / unsuspend a shop.
+ *
+ * This is `admin_set_shop_status` with the two statuses the toggle maps to, so
+ * the listing-visibility rule is not written a second time here.
+ */
 export async function toggleShopSuspend(
   shopId: string,
   suspended: boolean,
@@ -455,17 +233,17 @@ export async function toggleShopSuspend(
 
   try {
     const supabase = createAdminClient();
-    const next = suspended ? "approved" : "suspended";
 
-    const { error } = await supabase.from("shops").update({ status: next }).eq("id", shopId);
+    const { error } = await supabase.rpc("admin_set_shop_status", {
+      p_shop_id: shopId,
+      p_status: suspended ? "suspended" : "approved",
+      // A suspension needs a note the seller can read; the toggle has no
+      // free-text field, so it states the reason itself.
+      p_note: suspended ? "Suspended by an administrator." : null,
+      p_verified: null,
+      p_actor: admin.userId,
+    });
     if (error) return fail(error);
-
-    // Keep listings in step with the shop's visibility.
-    await supabase
-      .from("listings")
-      .update({ status: suspended ? "live" : "hidden" })
-      .eq("shop_id", shopId)
-      .eq("status", suspended ? "hidden" : "live");
 
     refreshAdmin();
     return { ok: true };
@@ -474,9 +252,9 @@ export async function toggleShopSuspend(
   }
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────────────────────────
  * Reviews
- * ────────────────────────────────────────────────────────────────────────── */
+ * ──────────────────────────────────────────────────────────────────────────── */
 export async function moderateReview(
   reviewId: string,
   status: "published" | "hidden",
@@ -496,9 +274,9 @@ export async function moderateReview(
   }
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────────────────────────
  * Buyers
- * ────────────────────────────────────────────────────────────────────────── */
+ * ──────────────────────────────────────────────────────────────────────────── */
 export async function setBuyerBanned(profileId: string, banned: boolean): Promise<ActionResult> {
   const admin = await requireAdmin();
   if (!admin.ok) return { ok: false, error: admin.error };
@@ -518,9 +296,9 @@ export async function setBuyerBanned(profileId: string, banned: boolean): Promis
   }
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────────────────────────
  * Platform settings
- * ────────────────────────────────────────────────────────────────────────── */
+ * ──────────────────────────────────────────────────────────────────────────── */
 export async function saveSettings(input: {
   commission_rate: number;
   subscription_price: number;
@@ -557,7 +335,7 @@ export async function saveSettings(input: {
   }
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────────────────────────
  * General notifications (broadcast)
  *
  * An admin sends one message to buyers, sellers, or everyone. It is stored as
@@ -570,7 +348,7 @@ export async function saveSettings(input: {
  * and, worse, would either all land or none — a partial send is far more
  * confusing than a slow one. Batching means a failure halfway through leaves a
  * known number delivered, which the result reports honestly.
- * ────────────────────────────────────────────────────────────────────────── */
+ * ──────────────────────────────────────────────────────────────────────────── */
 
 export type BroadcastAudience = "buyers" | "sellers" | "everyone";
 

@@ -34,11 +34,11 @@ const EMPTY = {
  *
  * All writes go through the server actions in
  * `src/app/admin-fuckliving/payment-account-actions.ts`, which run with the
- * service-role client on the server. They used to call the
- * `admin_save_payment_account` / `admin_delete_payment_account` RPCs straight
- * from the browser, and those raise "Admins only." unless the caller has a row
- * in `admin_users` - so on a console with no sign-in gate every save failed and
- * nothing changed.
+ * service-role client on the server and call the
+ * `admin_save_payment_account` / `admin_delete_payment_account` RPCs. Those
+ * RPCs are the single source of truth for the rules (required fields,
+ * deactivate-instead-of-delete); `sql/0043` makes `is_admin()` accept a
+ * service-role caller so they work from a Server Action without `auth.uid()`.
  */
 export function PaymentAccountsManager({ accounts }: { accounts: PaymentAccount[] }) {
   const router = useRouter();

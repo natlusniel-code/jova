@@ -3,7 +3,7 @@
 /**
  * Payment-account writes for the admin console.
  *
- * ── Why this file exists ──────────────────────────────────────────────────
+ * ── Why this file exists ───────────────────────────────────────────────────
  * The payment-accounts page used to call
  * `supabase.rpc("admin_save_payment_account", …)` and
  * `supabase.rpc("admin_delete_payment_account", …)` straight from the browser.
@@ -11,20 +11,17 @@
  *
  *     if not public.is_admin() then raise exception 'Admins only.'; end if;
  *
- * and `public.is_admin()` is true only when the caller has a row in
+ * and `public.is_admin()` was true only when the caller had a row in
  * `public.admin_users`. The console itself had no sign-in gate — it read
  * through the service role — so a signed-in admin whose account was never
- * inserted into `admin_users` (or every admin at all, on a project where that
- * table is empty) got "Admins only." on every save and nothing was written.
+ * inserted into `admin_users` got "Admins only." on every save.
  *
- * The write now happens here, server-side, exactly like the rest of
- * `actions.ts`: the service-role client is the authorisation, and the browser
- * never sees that key. The rules the RPC enforced are reproduced explicitly —
- * the three required fields, and deactivate-instead-of-delete when an order
- * already references the account, so order history keeps a real row to point
- * at.
+ * The first fix moved the write here and reproduced the RPC's rules in
+ * TypeScript. That left the rules in two places, which is exactly the drift
+ * this task removes: `sql/0043` fixes `is_admin()` to accept a `service_role`
+ * caller, so these actions now call the RPCs and the rules live only in SQL.
  *
- * ── Why `requireAdmin()` is the first line ────────────────────────────────
+ * ── Why `requireAdmin()` is the first line ─────────────────────────────────
  * A Server Action is its own endpoint. The middleware gate covers the page,
  * not this mutation, so the admin check is repeated here.
  */
@@ -66,7 +63,12 @@ export type PaymentAccountInput = {
   sort_order?: number;
 };
 
-/** Create a payment account, or update one when `id` is set. */
+/**
+ * Create a payment account, or update one when `id` is set.
+ *
+ * The three-required-fields rule and the trimming/normalisation are
+ * `admin_save_payment_account` in SQL (sql/0011) — not repeated here.
+ */
 export async function savePaymentAccount(
   input: PaymentAccountInput,
 ): Promise<ActionResult> {
@@ -74,43 +76,20 @@ export async function savePaymentAccount(
   if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
-  const bankName = (input.bank_name ?? "").trim();
-  const accountNumber = (input.account_number ?? "").trim();
-  const accountName = (input.account_name ?? "").trim();
-
-  if (!bankName || !accountNumber || !accountName) {
-    return {
-      ok: false,
-      error: "Bank name, account number and account name are all required.",
-    };
-  }
-
-  const sortOrder = Number(input.sort_order);
-  const row = {
-    bank_name: bankName,
-    account_number: accountNumber,
-    account_name: accountName,
-    label: (input.label ?? "").trim() || null,
-    note: (input.note ?? "").trim() || null,
-    active: input.active ?? true,
-    sort_order: Number.isFinite(sortOrder) ? sortOrder : 0,
-  };
-
   try {
     const supabase = createAdminClient();
 
-    if (input.id) {
-      const { data, error } = await supabase
-        .from("payment_accounts")
-        .update(row)
-        .eq("id", input.id)
-        .select("id");
-      if (error) return fail(error);
-      if (!data?.length) return { ok: false, error: "Account not found." };
-    } else {
-      const { error } = await supabase.from("payment_accounts").insert(row);
-      if (error) return fail(error);
-    }
+    const { error } = await supabase.rpc("admin_save_payment_account", {
+      p_id: input.id ?? null,
+      p_bank_name: input.bank_name ?? "",
+      p_account_number: input.account_number ?? "",
+      p_account_name: input.account_name ?? "",
+      p_label: input.label ?? null,
+      p_note: input.note ?? null,
+      p_active: input.active ?? true,
+      p_sort_order: Number.isFinite(Number(input.sort_order)) ? Number(input.sort_order) : 0,
+    });
+    if (error) return fail(error);
 
     refresh();
     return { ok: true };
@@ -119,7 +98,11 @@ export async function savePaymentAccount(
   }
 }
 
-/** Remove an account — deactivating it instead when an order used it. */
+/**
+ * Remove an account — deactivating it instead when an order used it, so order
+ * history keeps a real row to point at. That rule is
+ * `admin_delete_payment_account` in SQL (sql/0011).
+ */
 export async function deletePaymentAccount(id: string): Promise<ActionResult> {
   const admin = await requireAdmin();
   if (!admin.ok) return { ok: false, error: admin.error };
@@ -128,26 +111,10 @@ export async function deletePaymentAccount(id: string): Promise<ActionResult> {
   try {
     const supabase = createAdminClient();
 
-    const { data: used, error: usedErr } = await supabase
-      .from("orders")
-      .select("id")
-      .eq("payment_account_id", id)
-      .limit(1);
-    if (usedErr) return fail(usedErr);
-
-    if (used?.length) {
-      const { error } = await supabase
-        .from("payment_accounts")
-        .update({ active: false })
-        .eq("id", id);
-      if (error) return fail(error);
-    } else {
-      const { error } = await supabase
-        .from("payment_accounts")
-        .delete()
-        .eq("id", id);
-      if (error) return fail(error);
-    }
+    const { error } = await supabase.rpc("admin_delete_payment_account", {
+      p_id: id,
+    });
+    if (error) return fail(error);
 
     refresh();
     return { ok: true };

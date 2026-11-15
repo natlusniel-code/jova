@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
-import { JOBS_SECRET } from "@/lib/jobs-secret";
+import { jobsSecretOrNull } from "@/lib/jobs-secret";
 import { dispatchPush } from "@/lib/push";
 
 /**
@@ -22,15 +22,32 @@ import { dispatchPush } from "@/lib/push";
  * The order-timer call uses the anon key (RLS on). The push dispatcher needs
  * the service role to read every user's subscriptions — that stays
  * server-side, in `src/lib/push.ts`.
+ *
+ * The secret is read from `JOBS_SECRET` only. There is no committed fallback:
+ * if the variable is unset the endpoint is closed (503) rather than protected
+ * by a secret anyone can read in the repository.
  */
 async function run(request: Request) {
+  const expected = jobsSecretOrNull();
+  if (!expected) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "JOBS_SECRET is not set on this server, so /api/jobs/run is closed. " +
+          "Set it in the deployment environment (never commit it).",
+      },
+      { status: 503 },
+    );
+  }
+
   const headerSecret =
     request.headers.get("x-jobs-secret") ??
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
 
   const fromVercelCron = Boolean(request.headers.get("x-vercel-cron"));
 
-  if (!fromVercelCron && headerSecret !== JOBS_SECRET) {
+  if (!fromVercelCron && headerSecret !== expected) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 

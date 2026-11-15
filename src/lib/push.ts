@@ -1,7 +1,6 @@
 import "server-only";
 import { createAdminClient } from "./supabase/admin";
-import { VAPID_PUBLIC_KEY } from "./push-public";
-import { FALLBACK_VAPID_PRIVATE_KEY, VAPID_SUBJECT_FALLBACK } from "./push-private";
+import { webPushConfigOrNull, type WebPushConfig } from "./push-private";
 import { sendPush, type PushTarget } from "./webpush";
 import { notificationTitle, notificationBody, sourceFor } from "./notification-source";
 
@@ -14,19 +13,20 @@ import { notificationTitle, notificationBody, sourceFor } from "./notification-s
  * Every notification (order, chat, broadcast) is a row in
  * `public.notifications`. This claims the un-pushed rows and sends each to
  * that user's devices — one path, so any feature that writes a row is pushed
- * automatically, for buyers, sellers and admins alike. */
+ * automatically, for buyers, sellers and admins alike.
+ *
+ * The VAPID key pair comes from the environment only (`VAPID_PRIVATE_KEY` +
+ * `NEXT_PUBLIC_VAPID_PUBLIC_KEY`). There is no committed fallback any more; a
+ * server without them reports itself as unconfigured instead of signing with a
+ * leaked key. */
 
-const PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY?.trim() || FALLBACK_VAPID_PRIVATE_KEY;
-const SUBJECT = process.env.VAPID_SUBJECT?.trim() || VAPID_SUBJECT_FALLBACK;
-
-const VAPID_HEADERS = {
-  publicKey: VAPID_PUBLIC_KEY,
-  privateKey: PRIVATE_KEY,
-  subject: SUBJECT,
-};
+/** The VAPID triple, or null when this server has no key pair. */
+function vapid(): WebPushConfig | null {
+  return webPushConfigOrNull();
+}
 
 export function pushConfigured(): boolean {
-  return Boolean(VAPID_PUBLIC_KEY && PRIVATE_KEY);
+  return vapid() !== null;
 }
 
 type Claimed = {
@@ -64,7 +64,8 @@ export async function dispatchPush(limit = 50): Promise<DispatchResult> {
     pruned: 0,
   };
 
-  if (!pushConfigured()) {
+  const config = vapid();
+  if (!config) {
     return { ...base, error: "Web Push is not configured: no VAPID key pair." };
   }
 
@@ -119,7 +120,7 @@ export async function dispatchPush(limit = 50): Promise<DispatchResult> {
     };
 
     for (const t of targets) {
-      const outcome = await sendPush(t, payload, VAPID_HEADERS);
+      const outcome = await sendPush(t, payload, config);
       if (outcome.ok) {
         sent += 1;
       } else {
@@ -138,7 +139,7 @@ export async function dispatchPush(limit = 50): Promise<DispatchResult> {
   return { ok: true, configured: true, claimed: rows.length, sent, failed, pruned, error: lastError };
 }
 
-/* ── Opportunistic dispatch ───────────────────────────────────────────────
+/* ── Opportunistic dispatch ──────────────────────────────────────────────────
  * Vercel's Hobby plan only permits a daily cron, so a scheduled flush cannot
  * be relied on. Instead the dispatcher is driven from the pages themselves:
  * a cheap, throttled call on navigation, plus the explicit /api/jobs/run
