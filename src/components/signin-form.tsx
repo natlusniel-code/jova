@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signInAction } from "@/app/auth/actions";
 import { cn } from "@/lib/utils";
 import { Spinner, Alert } from "@/components/ui";
+import { GoogleSignInButton } from "@/components/google-sign-in-button";
 
 /**
  * Sign-in form.
@@ -16,8 +17,9 @@ import { Spinner, Alert } from "@/components/ui";
  * which is the store this app actually writes to, instead of against a
  * Supabase password that may never have been set for the account.
  *
- * Google sign-in is gone — the brief asked for it to be removed, and the
- * project never had the provider enabled anyway.
+ * Google sign-in is offered above the form via Appwrite OAuth2 (token flow).
+ * It is additive: the password path below is untouched, and both end in the
+ * same Supabase session, so the rest of the marketplace cannot tell them apart.
  */
 export function SignInForm() {
   const router = useRouter();
@@ -73,7 +75,19 @@ export function SignInForm() {
       <h1 className="text-[26px] font-extrabold tracking-tight text-ink-900">Welcome back</h1>
       <p className="mt-1.5 text-[13.5px] text-ink-500">Sign in to track orders, chats and payouts.</p>
 
-      <form onSubmit={submit} className="mt-6 space-y-3.5" noValidate>
+      {/* Google is offered first, as the quickest way in. The password form
+          below is unchanged, so every existing account still works exactly as
+          it did. Both paths end in the same Supabase session. */}
+      <div className="mt-5">
+        <GoogleSignInButton onError={setErr} />
+        <div className="mt-4 flex items-center gap-3">
+          <span className="h-px flex-1 bg-[var(--line)]" />
+          <span className="text-[12px] font-medium text-ink-400">or use your password</span>
+          <span className="h-px flex-1 bg-[var(--line)]" />
+        </div>
+      </div>
+
+      <form onSubmit={submit} className="mt-4 space-y-3.5" noValidate>
         <div>
           <label className="nm-label" htmlFor="email">Email address</label>
           <input
