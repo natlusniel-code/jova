@@ -26,7 +26,10 @@ export function appwriteErrorType(e: unknown): string {
  * person towards "send me a new code" — true for a wrong, expired or already
  * used code, which are indistinguishable to Appwrite and identical to fix.
  */
-export function friendlyAuthError(e: unknown): {
+export function friendlyAuthError(
+  e: unknown,
+  context: "send" | "confirm" = "send",
+): {
   message: string;
   needsNewCode: boolean;
 } {
@@ -77,10 +80,15 @@ export function friendlyAuthError(e: unknown): {
       };
 
     default:
+      // The wording must match what the person was doing. A failed *confirm*
+      // that said "we could not send your code" sent people hunting for a mail
+      // that had already arrived.
       return {
         message:
-          "We could not send your verification code just now. Please try again in a moment.",
-        needsNewCode: false,
+          context === "confirm"
+            ? "We could not confirm that code just now. Please try again, or ask for a new code."
+            : "We could not send your verification code just now. Please try again in a moment.",
+        needsNewCode: context === "confirm",
       };
   }
 }

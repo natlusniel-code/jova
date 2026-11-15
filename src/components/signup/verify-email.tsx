@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Alert, Spinner } from "@/components/ui";
-import { sendVerificationCode, confirmVerificationCode } from "@/lib/appwrite/otp";
+import { sendVerificationCode, confirmVerificationCode, endSession } from "@/lib/appwrite/otp";
 import { confirmEmailCodeAction } from "@/app/auth/verify-code-action";
 
 /**
@@ -96,7 +96,13 @@ export function VerifyEmail({ email, role }: { email: string; role: string }) {
       // Appwrite has confirmed the code. Now tell Supabase, so the marketplace
       // (RLS, the sign-in gate) knows this address is real. The JWT proves to
       // the server that the confirmation really happened.
+      //
+      // The Appwrite session is deleted only AFTER the server has verified the
+      // JWT: a JWT is only valid while its session exists, so deleting it first
+      // would invalidate the very token we are about to send.
       const mirrored = await confirmEmailCodeAction(confirmed.jwt);
+
+      await endSession(confirmed.sessionId);
 
       if (!mirrored.ok) {
         setErr(mirrored.error);

@@ -9,7 +9,7 @@ export type SendCodeResult =
   | { ok: false; error: string };
 
 export type ConfirmCodeResult =
-  | { ok: true; jwt: string }
+  | { ok: true; jwt: string; sessionId: string }
   | { ok: false; error: string; needsNewCode: boolean };
 
 /**
@@ -112,29 +112,26 @@ export async function confirmVerificationCode(
 
   const { account } = appwrite();
 
+  let sessionId = "";
   try {
-    await account.createSession({ userId, secret: clean });
+    const session = await account.createSession({ userId, secret: clean });
+    sessionId = session.$id;
   } catch (e) {
-    const { message, needsNewCode } = friendlyAuthError(e);
+    const { message, needsNewCode } = friendlyAuthError(e, "confirm");
     return { ok: false, error: message, needsNewCode };
   }
 
   let jwt = "";
   try {
-    // The session exists only for as long as this block runs.
     jwt = (await account.createJWT()).jwt;
   } catch {
     // The code was still correct — we just could not mint the JWT. The caller
     // can sign in and retry; the address is genuinely confirmed either way.
-  } finally {
-    try {
-      await account.deleteSession({ sessionId: "current" });
-    } catch {
-      // Already gone. Nothing to clean up.
-    }
   }
 
   if (!jwt) {
+    // Nothing will verify this session, so clean it up now.
+    await endSession(sessionId);
     return {
       ok: false,
       error:
@@ -143,5 +140,29 @@ export async function confirmVerificationCode(
     };
   }
 
-  return { ok: true, jwt };
+  // ── The session must OUTLIVE the JWT ──────────────────────────────────────
+  // An Appwrite JWT is a stateless claim *about a session*: it is only valid
+  // while that session exists. Deleting the session here — which an earlier
+  // version of this file did — invalidated the JWT before the server action
+  // ever saw it, so every correct code ended in "that confirmation has
+  // expired". The caller deletes the session with `endSession()` once the
+  // server has finished verifying.
+  return { ok: true, jwt, sessionId };
+}
+
+/**
+ * Delete an Appwrite session by id.
+ *
+ * Called by the caller *after* the server action has verified the JWT, so no
+ * live Appwrite session is left behind for a user who belongs to Supabase.
+ * Never throws: a session that is already gone is the desired end state.
+ */
+export async function endSession(sessionId: string): Promise<void> {
+  if (!sessionId) return;
+  try {
+    const { account } = appwrite();
+    await account.deleteSession({ sessionId });
+  } catch {
+    // Already gone, or expired. Either way there is nothing left to clean up.
+  }
 }
