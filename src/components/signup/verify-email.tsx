@@ -1,108 +1,250 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { resendVerificationAction } from "@/app/auth/actions";
-import { Spinner, Alert } from "@/components/ui";
+import { Alert, Spinner } from "@/components/ui";
+import { sendVerificationCode, confirmVerificationCode } from "@/lib/appwrite/otp";
+import { confirmEmailCodeAction } from "@/app/auth/verify-code-action";
 
 /**
- * Signup step 3 — "check your email".
+ * "Check your email" — and type the 6-digit code.
  *
- * ── What this screen used to be ───────────────────────────────────────────
- * It displayed a 6-digit code in a dashed box and asked the person to retype
- * it. That verified nothing: the code was on the same screen, so anyone at the
- * keyboard could read it. It has been removed entirely.
+ * ── Who sends the mail ────────────────────────────────────────────────────
+ * Appwrite does, from its own built-in SMTP. There is no Resend key and no
+ * `EMAIL_FROM` in this app: the sender address is Appwrite's, the template is
+ * Appwrite's, and nothing about mail delivery can be misconfigured on our
+ * deployment.
  *
- * ── What it is now ────────────────────────────────────────────────────────
- * A confirmation that a link was sent to the address, and a way to send it
- * again. The actual confirmation happens when the link is opened, on
- * `/auth/verify`, where the token is consumed on the server.
+ * ── Why the code is typed and not clicked ─────────────────────────────────
+ * A 6-digit code works on any device, survives a mail client that strips
+ * links, and — unlike the old screen — is never displayed in the app itself.
+ * The code only exists in the inbox, so typing it back is what proves access
+ * to the address.
  *
- * The resend button is rate-limited by the database (issuing a token deletes
- * the previous one), so a second click invalidates the first link rather than
- * leaving two live.
+ * ── Sending happens on mount ──────────────────────────────────────────────
+ * Arriving here means signup just succeeded, so the first code goes out
+ * without another click. `sentOnce` guards against React's development
+ * double-mount sending two mails; a real second send is the explicit button.
  */
-export function VerifyEmail({
-  email,
-  role,
-}: {
-  email: string;
-  role: string;
-}) {
+
+const CODE_LENGTH = 6;
+
+export function VerifyEmail({ email, role }: { email: string; role: string }) {
+  const [userId, setUserId] = useState("");
+  const [code, setCode] = useState("");
   const [err, setErr] = useState("");
-  const [sent, setSent] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [needsNewCode, setNeedsNewCode] = useState(false);
+  const [done, setDone] = useState(false);
+  const [sending, setSending] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  function resend() {
-    setErr("");
-    setSent(false);
+  // A ref, not state: the guard must survive the double-invoked effect that
+  // React runs in development without triggering a re-render itself.
+  const sentOnce = useRef(false);
 
-    const fd = new FormData();
-    fd.set("email", email);
-    fd.set("role", role);
+  async function send() {
+    setErr("");
+    setNotice("");
+    setNeedsNewCode(false);
+    setSending(true);
+
+    const result = await sendVerificationCode(email);
+
+    setSending(false);
+
+    if (!result.ok) {
+      setErr(result.error);
+      return;
+    }
+
+    setUserId(result.userId);
+    setNotice(
+      "We have sent a 6-digit code to your email. It expires in 15 minutes.",
+    );
+  }
+
+  useEffect(() => {
+    if (sentOnce.current) return;
+    sentOnce.current = true;
+    void send();
+    // `send` is intentionally not a dependency: this must run exactly once,
+    // on arrival, not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function submit() {
+    setErr("");
+    setNotice("");
+
+    if (!userId) {
+      setErr(
+        "We have not sent a code yet. Tap “Send me a new code”, then try again.",
+      );
+      return;
+    }
 
     startTransition(async () => {
-      const result = await resendVerificationAction(fd);
-      if (!result.ok) {
-        setErr(result.error);
+      const confirmed = await confirmVerificationCode(userId, code);
+
+      if (!confirmed.ok) {
+        setErr(confirmed.error);
+        setNeedsNewCode(confirmed.needsNewCode);
         return;
       }
-      setSent(true);
+
+      // Appwrite has confirmed the code. Now tell Supabase, so the marketplace
+      // (RLS, the sign-in gate) knows this address is real. The JWT proves to
+      // the server that the confirmation really happened.
+      const mirrored = await confirmEmailCodeAction(confirmed.jwt);
+
+      if (!mirrored.ok) {
+        setErr(mirrored.error);
+        return;
+      }
+
+      setDone(true);
     });
   }
 
+  // ── Confirmed ─────────────────────────────────────────────────────────
+  if (done) {
+    return (
+      <div className="mx-auto w-full max-w-[420px] text-center">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-brand-50">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-8 w-8 text-brand-600"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </div>
+
+        <h1 className="mt-5 text-[24px] font-extrabold tracking-tight text-ink-900">
+          Your email is confirmed
+        </h1>
+        <p className="mx-auto mt-1.5 max-w-[330px] text-[13.5px] leading-relaxed text-ink-500">
+          Thank you.{" "}
+          <strong className="font-semibold text-ink-800">{email}</strong> is now
+          verified — sign in with it and your password.
+        </p>
+
+        <Link href="/signin" className="nm-btn-primary mt-6 block w-full py-3">
+          Sign in
+        </Link>
+      </div>
+    );
+  }
+
+  // ── Waiting for the code ──────────────────────────────────────────────
   return (
-    <div className="mx-auto w-full max-w-[420px] text-center">
+    <div className="mx-auto w-full max-w-[420px]">
       <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-brand-50">
-        <svg viewBox="0 0 24 24" className="h-8 w-8 text-brand-600" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          className="h-8 w-8 text-brand-600"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.7}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <rect x="3" y="5" width="18" height="14" rx="2.2" />
           <path d="m3.5 7 8.5 6 8.5-6" />
         </svg>
       </div>
 
-      <h1 className="mt-5 text-[24px] font-extrabold tracking-tight text-ink-900">
-        Check your email
+      <h1 className="mt-5 text-center text-[24px] font-extrabold tracking-tight text-ink-900">
+        Enter your code
       </h1>
-      <p className="mx-auto mt-1.5 max-w-[340px] text-[13.5px] leading-relaxed text-ink-500">
-        We have sent a confirmation link to{" "}
-        <strong className="font-semibold text-ink-800">{email}</strong>. Open it
-        to confirm your account, then sign in with your email and password.
+      <p className="mx-auto mt-1.5 max-w-[340px] text-center text-[13.5px] leading-relaxed text-ink-500">
+        We sent a 6-digit code to{" "}
+        <strong className="font-semibold text-ink-800">{email}</strong>. Type it
+        below to confirm your account.
       </p>
 
-      <div className="mt-5 rounded-2xl border border-[var(--line)] bg-slate-50/70 px-4 py-4 text-left">
-        <p className="text-[12px] font-bold uppercase tracking-wider text-ink-500">
-          What happens next
-        </p>
-        <ol className="mt-2 space-y-1.5 text-[13px] leading-relaxed text-ink-600">
-          <li>1. Open the email from NaijaMart.</li>
-          <li>2. Tap <strong className="text-ink-800">Confirm my email address</strong>.</li>
-          <li>3. Sign in with your email and password.</li>
-        </ol>
-      </div>
+      <label
+        htmlFor="verify-code"
+        className="mt-5 block text-[12px] font-bold uppercase tracking-wider text-ink-500"
+      >
+        Verification code
+      </label>
+      <input
+        id="verify-code"
+        type="text"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        maxLength={CODE_LENGTH}
+        value={code}
+        onChange={(e) =>
+          setCode(e.target.value.replace(/\D/g, "").slice(0, CODE_LENGTH))
+        }
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && code.length === CODE_LENGTH && !pending) {
+            submit();
+          }
+        }}
+        placeholder="••••••"
+        className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-center text-[22px] font-bold tracking-[0.4em] text-ink-900 outline-none focus:border-brand-500"
+      />
 
-      {err && <div className="mt-4"><Alert tone="red">{err}</Alert></div>}
-      {sent && (
-        <div className="mt-4">
-          <Alert tone="green">A new link is on its way. The older one no longer works.</Alert>
+      {err && (
+        <div className="mt-3">
+          <Alert tone="red">{err}</Alert>
+        </div>
+      )}
+      {notice && !err && (
+        <div className="mt-3">
+          <Alert tone="blue">{notice}</Alert>
         </div>
       )}
 
       <button
-        onClick={resend}
-        disabled={pending}
-        className="nm-btn-ghost mt-4 w-full !py-3"
+        onClick={submit}
+        disabled={pending || code.length !== CODE_LENGTH}
+        className="nm-btn-primary mt-3 w-full !py-3 disabled:opacity-50"
       >
-        {pending ? <><Spinner /> Sending…</> : "Send the link again"}
+        {pending ? (
+          <>
+            <Spinner /> Confirming…
+          </>
+        ) : (
+          "Confirm my email"
+        )}
       </button>
 
-      <Alert tone="blue">
-        The link expires in 48 hours. If you cannot find the email, check your
-        spam folder before asking for another.
-      </Alert>
+      <button
+        onClick={send}
+        disabled={sending}
+        className="nm-btn-ghost mt-2.5 w-full !py-3 disabled:opacity-50"
+      >
+        {sending ? (
+          <>
+            <Spinner /> Sending…
+          </>
+        ) : needsNewCode ? (
+          "Send me a new code"
+        ) : (
+          "Send the code again"
+        )}
+      </button>
 
-      <p className="mt-4 text-[12.5px] text-ink-500">
+      <p className="mt-4 text-center text-[12.5px] leading-relaxed text-ink-500">
+        The code expires in 15 minutes and can only be used once. If it does not
+        arrive, check your spam folder, then ask for a new one.
+      </p>
+
+      <p className="mt-2 text-center text-[12.5px] text-ink-500">
         Wrong email?{" "}
-        <Link href="/signup/details" className="font-semibold text-brand-600 hover:underline">
+        <Link
+          href="/signup/details"
+          className="font-semibold text-brand-600 hover:underline"
+        >
           Start again
         </Link>
       </p>

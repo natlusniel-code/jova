@@ -17,7 +17,7 @@ import {
   verifyCode,
 } from "@/lib/auth/local";
 import { postAuthDestination } from "@/lib/post-auth";
-import { sendVerificationEmail, isEmailVerified } from "@/lib/email/verify";
+import { isEmailVerified } from "@/lib/email/verify";
 
 /**
  * Every sign-in, sign-up and reset action for the site.
@@ -173,31 +173,17 @@ export async function startSignupAction(formData: FormData): Promise<ActionResul
     const userId = await createAccountUser({ email, fullName, phone, state, city, role });
     await setPassword(userId, email, password);
 
-    // ── Email the verification link ────────────────────────────────────────
-    // The old flow generated a code and returned it to the form, which showed
-    // it on screen. That proved nothing — whoever was at the keyboard could
-    // read it. The link goes to the address itself, so only someone with
-    // access to the inbox can confirm the account.
+    // ── The verification code is sent by the browser, not here ────────────
+    // Appwrite mails the 6-digit code, and the call that asks for it
+    // (`createEmailToken`) has to come from the browser: Appwrite binds the
+    // code to our origin through the `OTP-Token` header, which it can only
+    // read from a real browser request. A Server Action sends no `Origin`,
+    // so the code would arrive without autofill and without that binding.
     //
-    // If the mail cannot be sent we say so plainly. Letting the person sit on
-    // a "check your email" screen for a message that never left would be the
-    // worst outcome, so the account is still created (they can request a new
-    // link from sign-in) but the error is surfaced.
-    const sent = await sendVerificationEmail({
-      email,
-      firstName: fullName.split(" ")[0] ?? fullName,
-      role,
-    });
-
-    if (!sent.ok) {
-      return {
-        ok: false,
-        error: sent.error,
-        field: "email",
-        email,
-      };
-    }
-
+    // So this action stops at "account created". The client redirects to
+    // /signup/verify, which sends the first code on mount and shows the
+    // entry box. Nothing here can fail because a mail provider is missing —
+    // there is no mail provider in this app any more.
     return { ok: true, email };
   } catch (e) {
     console.error("[auth] signup failed", e);
@@ -209,51 +195,21 @@ export async function startSignupAction(formData: FormData): Promise<ActionResul
 }
 
 // ───────────────────────────────────────────────────────────────────────
-// sign up — step 2: the person opens the link in their email
-// ───────────────────────────────────────────────────────────────────────
-/**
- * Send a fresh verification link.
- *
- * The old `verifySignupAction` / `resendSignupCodeAction` pair is gone: there
- * is no code to retype any more, so there is nothing for the browser to check.
- * Confirmation happens on `/auth/verify` when the link is opened, and this
- * action only re-sends it.
- *
- * It deliberately does not reveal whether the address has an account — the
- * reply is the same either way, so the form cannot be used to enumerate users.
- */
-export async function resendVerificationAction(
-  formData: FormData,
-): Promise<ActionResult> {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const role = String(formData.get("role") ?? "buyer") === "seller" ? "seller" : "buyer";
-
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) {
-    return { ok: false, error: "Enter a valid email address.", field: "email" };
-  }
-
-  try {
-    // Already confirmed? Nothing to resend — send them to sign in instead.
-    if (await isEmailVerified(email)) {
-      return { ok: true, next: "/signin" };
-    }
-
-    const sent = await sendVerificationEmail({
-      email,
-      firstName: email.split("@")[0],
-      role,
-    });
-    if (!sent.ok) return { ok: false, error: sent.error };
-
-    return { ok: true, email };
-  } catch (e) {
-    console.error("[auth] resend verification failed", e);
-    return {
-      ok: false,
-      error: "We couldn't send a new link just now. Please try again in a moment.",
-    };
-  }
-}
+// sign up — step 2: the person types the code Appwrite emailed them
+// ─────────────────────────────────────────────────────────────────────────
+// There is no server action for sending or checking the code any more.
+//
+// Sending is `createEmailToken` in the browser (src/lib/appwrite/otp.ts) and
+// checking is `createSession` with the typed code, also in the browser. Both
+// need only the public project ID, and doing them client-side is what lets
+// Appwrite bind the code to our origin for autofill.
+//
+// The one thing that must stay on the server is writing the verified flag to
+// Supabase, because that needs the service role. That is
+// `confirmEmailCodeAction` in ./verify-code-action.ts, which verifies the
+// Appwrite JWT before it writes anything.
+//
+// The old `resendVerificationAction` is gone with the link flow it served.
 
 // ───────────────────────────────────────────────────────────────────────
 // password reset — no email, so the phone number on the account is the

@@ -5,37 +5,39 @@ import { VAPID_PUBLIC_KEY } from "./push-public";
 /**
  * Web Push (VAPID) server configuration.
  *
- * ── Why the private key is committed here ──────────────────────────────────
- * This is the ORIGINAL key pair the site has always used, restored in code
- * after the move to environment variables broke delivery. The deployment never
- * had `VAPID_PRIVATE_KEY` set, so `webPushConfig()` threw, `dispatchPush()`
- * returned "not configured", and no notification was ever signed or sent —
- * while every existing subscription row stayed bound to this key.
+ * ── The private key is NOT in this file ───────────────────────────────────
+ * It is read from `VAPID_PRIVATE_KEY` and from nowhere else. There is no
+ * committed fallback, and there must never be one again: this key was
+ * committed once, purged from all 99 commits of history, and then
+ * accidentally re-committed. A VAPID private key is the only thing that
+ * authenticates a push to a subscriber, so anyone who can read the repository
+ * could sign a notification and deliver it to every subscriber of this site.
  *
- * The pair is verified: the private scalar below derives exactly the public
- * point in `push-public.ts`, and a sign/verify round-trip with the two passes.
+ * ── Why the public key IS a literal ───────────────────────────────────────
+ * `push-public.ts` keeps the original public key in code, and that is
+ * deliberate. A VAPID public key is not a secret — it is handed to every
+ * browser that subscribes, and it is inlined into the client bundle either
+ * way. Keeping it fixed is also what makes existing subscriptions keep
+ * working: a subscription is bound to the public key it was created with, so
+ * a stable public key means no one has to re-subscribe.
  *
- * ── What this costs ────────────────────────────────────────────────────────
- * Anyone with read access to this repository can sign a push and deliver it to
- * a subscriber of this site. Web Push has no other authenticator. The blast
- * radius is narrow — it cannot read data or act as a user, only raise a
- * notification — but it is real, and it is why this repository must stay
- * PRIVATE (already a hard requirement, because of the Supabase service-role
- * key).
+ * ── Why the pair must match ───────────────────────────────────────────────
+ * The server can only sign for a subscription with the private key matching
+ * the public key that subscription was created with. So `VAPID_PRIVATE_KEY`
+ * in the deployment MUST be the private half of `VAPID_PUBLIC_KEY` in
+ * `push-public.ts`. If they do not match, every send is rejected by the push
+ * service with 403 and nothing is delivered.
  *
- * ── Rotating ───────────────────────────────────────────────────────────────
- * Rotating invalidates every existing subscription: a subscription is bound to
- * the public key it was created with. Devices re-subscribe automatically on
- * next load, because `ensurePushSubscription()` runs on every signed-in page —
- * but only if BOTH halves are changed together, in `push-public.ts` and here.
+ * ── Failing loudly ────────────────────────────────────────────────────────
+ * A missing key throws rather than degrading to "not configured". A silent
+ * skip is how the previous outage went unnoticed: `dispatchPush()` reported
+ * success while no notification was ever signed. `webPushConfigOrNull()` is
+ * kept for callers that genuinely want to probe without throwing.
  */
 
-/** The VAPID private key. Server-only; never import this from a client module. */
-export const VAPID_PRIVATE_KEY =
-  "REDACTED_VAPID_PRIVATE_KEY";
-
 /** VAPID subject: a mailto: or https: URL identifying the sender to the push service. */
-export const VAPID_SUBJECT = "mailto:support@naijamart.ng";
+export const VAPID_SUBJECT =
+  process.env.VAPID_SUBJECT || "mailto:support@naijamart.ng";
 
 export type WebPushConfig = {
   publicKey: string;
@@ -44,24 +46,53 @@ export type WebPushConfig = {
 };
 
 /**
- * The VAPID triple.
+ * The VAPID private key, or null when the deployment has not set it.
  *
- * Always returns a config: the pair is in code, so there is no "unconfigured"
- * state to degrade into. Kept as a function so callers do not change shape.
+ * Trimmed because a trailing newline pasted into a dashboard is the single
+ * most common way this variable arrives broken, and a key with a newline
+ * fails to parse with a message that does not mention whitespace.
+ */
+function privateKey(): string | null {
+  const key = process.env.VAPID_PRIVATE_KEY?.trim();
+  return key ? key : null;
+}
+
+/**
+ * The VAPID triple, or null when the private key is missing.
+ *
+ * For callers that want to report "push is not configured" instead of
+ * throwing — the jobs endpoint uses this so a missing key does not fail the
+ * whole run.
  */
 export function webPushConfigOrNull(): WebPushConfig | null {
+  const key = privateKey();
+  if (!key) return null;
+
   return {
     publicKey: VAPID_PUBLIC_KEY,
-    privateKey: VAPID_PRIVATE_KEY,
+    privateKey: key,
     subject: VAPID_SUBJECT,
   };
 }
 
-/** The VAPID triple for signing a push. */
+/**
+ * The VAPID triple for signing a push.
+ *
+ * Throws when `VAPID_PRIVATE_KEY` is unset. That is intentional: a push that
+ * cannot be signed is a bug in the deployment, and it should surface as one
+ * rather than as a notification that quietly never arrives.
+ */
 export function webPushConfig(): WebPushConfig {
-  return {
-    publicKey: VAPID_PUBLIC_KEY,
-    privateKey: VAPID_PRIVATE_KEY,
-    subject: VAPID_SUBJECT,
-  };
+  const config = webPushConfigOrNull();
+
+  if (!config) {
+    throw new Error(
+      "VAPID_PRIVATE_KEY is not set. Web Push cannot sign a notification without it. " +
+        "Set it in the deployment environment (Vercel → Project Settings → " +
+        "Environment Variables, Production and Preview). It must be the private " +
+        "half of the public key in src/lib/push-public.ts.",
+    );
+  }
+
+  return config;
 }

@@ -1,99 +1,67 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendEmail } from "@/lib/email/send";
-import { verificationEmail } from "@/lib/email/templates";
 
 /**
- * Email verification by link.
+ * Email verification — the Supabase side.
  *
- * ── What replaced what ────────────────────────────────────────────────────
- * The old method generated a 6-digit code, displayed it on the signup screen
- * and asked the person to retype it. That verified nothing: the code was
- * visible to whoever was already at the keyboard, so it proved no access to
- * the inbox at all. It is gone. A signup now sends a link to the address, and
- * only opening that link confirms the account.
+ * ── Who sends the mail ────────────────────────────────────────────────────
+ * Appwrite does, from its own built-in SMTP. This app has no mail provider:
+ * no Resend key, no `EMAIL_FROM`, no SMTP socket, no template. The sending
+ * and the code check both happen in the browser (src/lib/appwrite/otp.ts),
+ * because Appwrite binds the emailed code to the requesting origin.
  *
- * ── Where the state lives ─────────────────────────────────────────────────
- *   • the token — `one_time_codes`, purpose 'verify', 48-hour expiry, single
- *     use (deleted the moment it is consumed);
- *   • the confirmed flag — `profiles.email_verified_at`.
+ * ── What is left here ─────────────────────────────────────────────────────
+ * Only the flag. `profiles.email_verified_at` is what the marketplace reads —
+ * RLS policies, the sign-in gate and every page already use it, and none of
+ * them should have to call Appwrite to find out whether an address is real.
+ * So this module owns the two operations on that flag:
  *
- * Both are handled by the `nm_issue_verify_token` / `nm_consume_verify_token`
- * functions in sql/0044, so the rules live in the database rather than being
- * re-implemented in every caller.
+ *   • `markEmailVerified` — write it, after Appwrite has confirmed the code;
+ *   • `isEmailVerified`   — read it, on the sign-in path.
+ *
+ * Both go through SQL functions (sql/0046) so the rule lives in the database
+ * rather than being re-implemented in every caller.
  */
-
-/** The public origin, for building the link. */
-function siteUrl(): string {
-  const explicit = process.env.NEXT_PUBLIC_SITE_URL;
-  if (explicit) return explicit.replace(/\/$/, "");
-  // Vercel sets this for every deployment, including previews.
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return "http://localhost:3000";
-}
 
 /**
- * Issue a token and email the link.
+ * Mirror Appwrite's confirmed state into Supabase.
  *
- * Returns `{ ok: false }` with a readable message when the mail could not be
- * sent, so the signup action can tell the person the truth instead of leaving
- * them waiting for a link that never left the building.
+ * Called by `confirmEmailCodeAction` only after the Appwrite JWT has been
+ * verified, so the email passed here is the one Appwrite reported — never one
+ * the browser supplied.
+ *
+ * A failure is logged but not surfaced: the address IS confirmed at Appwrite,
+ * and the next sign-in attempt re-syncs it. Failing the whole flow here would
+ * tell the person their code was wrong when it was not.
  */
-export async function sendVerificationEmail(input: {
-  email: string;
-  firstName: string;
-  role: "buyer" | "seller";
-}): Promise<{ ok: true } | { ok: false; error: string }> {
-  const admin = createAdminClient();
-
-  const { data: token, error } = await admin.rpc("nm_issue_verify_token", {
-    p_email: input.email,
-  });
-  if (error) {
-    // The RPC error is a Postgres message (`function … does not exist`,
-    // `duplicate key value violates …`). It belongs in the log, not on the
-    // signup screen, so it is never interpolated into the returned message.
-    console.error("[email] could not issue a verification token", error);
-    return {
-      ok: false,
-      error:
-        "We could not prepare your verification link just now. Please try again in a moment.",
-    };
+export async function markEmailVerified(email: string): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    const { error } = await admin.rpc("nm_set_email_verified", {
+      p_email: email.trim().toLowerCase(),
+    });
+    if (error) {
+      console.error("[email] could not mirror the verified flag", error);
+    }
+  } catch (e) {
+    console.error("[email] could not mirror the verified flag", e);
   }
-
-  const verifyUrl = `${siteUrl()}/auth/verify?token=${encodeURIComponent(String(token))}`;
-  const mail = verificationEmail({
-    firstName: input.firstName,
-    verifyUrl,
-    role: input.role,
-  });
-
-  return sendEmail({
-    to: input.email,
-    subject: mail.subject,
-    html: mail.html,
-    text: mail.text,
-  });
 }
 
 /**
- * Consume a token. Returns the email it belonged to, or null when the token is
- * unknown, expired or already used.
+ * Has this address been confirmed?
+ *
+ * Reads Supabase, which is what the sign-in gate and RLS already use. Returns
+ * false on any error — an unreadable flag must never be treated as "verified".
  */
-export async function consumeVerificationToken(
-  token: string,
-): Promise<string | null> {
-  const admin = createAdminClient();
-  const { data, error } = await admin.rpc("nm_consume_verify_token", {
-    p_token: token,
-  });
-  if (error) return null;
-  return (data as string | null) ?? null;
-}
-
-/** Has this address been confirmed? */
 export async function isEmailVerified(email: string): Promise<boolean> {
-  const admin = createAdminClient();
-  const { data, error } = await admin.rpc("nm_email_verified", { p_email: email });
-  if (error) return false;
-  return Boolean(data);
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin.rpc("nm_email_verified", {
+      p_email: email.trim().toLowerCase(),
+    });
+    if (error) return false;
+    return Boolean(data);
+  } catch {
+    return false;
+  }
 }
