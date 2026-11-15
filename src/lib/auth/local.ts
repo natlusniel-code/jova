@@ -12,36 +12,46 @@ type CookieToSet = {
 };
 
 /**
- * NaijaMart's own sign-in — server side.
+ * NaijaMart's session plumbing — server side.
  *
- * ── The split ────────────────────────────────────────────────────────────
- * Supabase Auth no longer decides whether a password is correct. That is
- * `public.account_credentials` (sql/0015), checked by `nm_login()`.
+ * ── What this file is now ───────────────────────────────────────────────────
+ * Google is the only way into the marketplace, so there is no password store
+ * to read and no account to create here. What remains is the machinery that
+ * turns a verified identity into a Supabase session, because every table in
+ * this project is protected by RLS keyed on `auth.uid()`:
  *
- * Supabase sessions are still used, because every table in this project is
- * protected by RLS keyed on `auth.uid()`. Once the password has been verified
- * here, `mintSession()` gives that user a real Supabase session, so all ~170
- * existing queries keep working untouched.
+ *   • `mintSession`   — give an already-verified user a real Supabase session;
+ *   • `requestClient` — the SSR client bound to the current request's cookies;
+ *   • `checkPassword` — used ONLY by the separate admin console login, which
+ *                       is not part of the public sign-in surface.
  *
- * ── Why minting needs no password ────────────────────────────────────────
+ * ── What was removed ────────────────────────────────────────────────────────
+ * `createAccountUser`, `setPassword`, `emailTaken`, `phoneMatches`,
+ * `accountHasPhone`, `issueCode` and `verifyCode` all served the email +
+ * password signup, the email verification code, and the phone-based password
+ * reset. All three flows are gone, so those functions are gone with them
+ * rather than left as dead code that still looks callable.
+ *
+ * ── Why minting needs no password ───────────────────────────────────────────
  * `admin.generateLink({ type: "magiclink" })` returns a one-time
  * `hashed_token` for an existing user. `verifyOtp({ token_hash })` exchanges it
  * for a session and writes the auth cookies. The token is single-use and
- * expires in minutes, and it is only ever created on the server, after our own
- * password check has passed — so it is not a way in, it is the last step of a
- * sign-in that already succeeded.
- *
- * ── Why the service role ─────────────────────────────────────────────────
- * `nm_login` is a password oracle. It is EXECUTE-revoked from anon and
- * authenticated (sql/0015), so only this module — which runs on the server —
- * can call it. The browser never sees a hash and never talks to these RPCs.
+ * expires in minutes, and it is only ever created on the server, after the
+ * identity has already been proven — by Google, or by the admin console's own
+ * password check. It is not a way in; it is the last step of a sign-in that
+ * already succeeded.
  */
 
 export type LoginVerdict =
   | { ok: true; userId: string; email: string; role: string }
   | { ok: false; error: "invalid" | "locked" | "banned" | "no_credentials"; retryAfter?: number };
 
-/** Ask the database whether this email + password pair is correct. */
+/**
+ * Ask the database whether this email + password pair is correct.
+ *
+ * Only the admin console uses this now. The public sign-in is Google-only, so
+ * this is never reachable from the marketplace's own auth pages.
+ */
 export async function checkPassword(email: string, password: string): Promise<LoginVerdict> {
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("nm_login", {
@@ -75,17 +85,6 @@ export async function checkPassword(email: string, password: string): Promise<Lo
 
   const reason = (v.error ?? "invalid") as "invalid" | "locked" | "banned" | "no_credentials";
   return { ok: false, error: reason, retryAfter: v.retry_after_seconds };
-}
-
-/** Store (or replace) a password for an account. */
-export async function setPassword(userId: string, email: string, password: string): Promise<void> {
-  const admin = createAdminClient();
-  const { error } = await admin.rpc("nm_set_password", {
-    p_user_id: userId,
-    p_email: email,
-    p_password: password,
-  });
-  if (error) throw new Error(error.message);
 }
 
 /**
@@ -151,126 +150,4 @@ export function requestClient() {
       },
     },
   });
-}
-
-/** Is this address already an account (in either store)? */
-export async function emailTaken(email: string): Promise<boolean> {
-  const admin = createAdminClient();
-  const { data, error } = await admin.rpc("nm_email_taken", { p_email: email });
-  if (error) throw new Error(error.message);
-  return Boolean(data);
-}
-
-/** Does the phone number match the one recorded on this account? */
-export async function phoneMatches(email: string, phone: string): Promise<boolean> {
-  const admin = createAdminClient();
-  const { data, error } = await admin.rpc("nm_phone_matches", {
-    p_email: email,
-    p_phone: phone,
-  });
-  if (error) throw new Error(error.message);
-  return Boolean(data);
-}
-
-/**
- * Does this account have a phone number on record at all?
- *
- * Used by the reset flow to decide whether the phone is a required field: an
- * account created before phone numbers were collected must not be locked out
- * of resetting its own password.
- */
-export async function accountHasPhone(email: string): Promise<boolean> {
-  const admin = createAdminClient();
-  const { data, error } = await admin.rpc("nm_account_has_phone", { p_email: email });
-  if (error) throw new Error(error.message);
-  return Boolean(data);
-}
-
-/** Mint a fresh 6-digit code for this email + purpose. */
-export async function issueCode(email: string, purpose: "signup" | "reset"): Promise<string> {
-  const admin = createAdminClient();
-  const { data, error } = await admin.rpc("nm_issue_code", {
-    p_email: email,
-    p_purpose: purpose,
-  });
-  if (error) throw new Error(error.message);
-  return String(data);
-}
-
-export type CodeVerdict =
-  | { ok: true }
-  | { ok: false; error: "no_code" | "expired" | "too_many" | "mismatch"; rotatedCode?: string; attemptsLeft?: number };
-
-/** Check a retyped code. A wrong code rotates to a new one. */
-export async function verifyCode(
-  email: string,
-  code: string,
-  purpose: "signup" | "reset",
-): Promise<CodeVerdict> {
-  const admin = createAdminClient();
-  const { data, error } = await admin.rpc("nm_verify_code", {
-    p_email: email,
-    p_code: code,
-    p_purpose: purpose,
-  });
-  if (error) throw new Error(error.message);
-
-  const v = data as {
-    ok: boolean;
-    error?: string;
-    rotated_code?: string;
-    attempts_left?: number;
-  };
-
-  if (v.ok) return { ok: true };
-  return {
-    ok: false,
-    error: (v.error ?? "mismatch") as "no_code" | "expired" | "too_many" | "mismatch",
-    rotatedCode: v.rotated_code,
-    attemptsLeft: v.attempts_left,
-  };
-}
-
-/**
- * Create the auth user for a new account, with no email involved.
- *
- * `email_confirm: true` is what removes the confirmation email: the account is
- * born confirmed, and the code the user retypes on screen is our own check
- * (sql/0015), not Supabase's. The password given here is a throwaway — the
- * real one lives only in `account_credentials`, so a Supabase password grant
- * can never be used to sign in as this user.
- */
-export async function createAccountUser(input: {
-  email: string;
-  fullName: string;
-  phone: string;
-  state: string;
-  city: string;
-  role: "buyer" | "seller";
-}): Promise<string> {
-  const admin = createAdminClient();
-
-  const { data, error } = await admin.auth.admin.createUser({
-    email: input.email,
-    // 48 random bytes, never shown to anyone. It exists only because the admin
-    // API requires a password field.
-    password: crypto.randomUUID() + crypto.randomUUID(),
-    email_confirm: true,
-    user_metadata: {
-      full_name: input.fullName,
-      phone: input.phone,
-      state: input.state,
-      city: input.city,
-      role: input.role,
-    },
-  });
-
-  if (error) {
-    if (/already|exists|registered/i.test(error.message)) {
-      throw new Error("That email is already registered. Try signing in.");
-    }
-    throw new Error(error.message);
-  }
-
-  return data.user.id;
 }

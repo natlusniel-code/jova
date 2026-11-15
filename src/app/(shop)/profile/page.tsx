@@ -4,7 +4,7 @@ import { getSession, createClient } from "@/lib/supabase/server";
 import { naira, shortDate } from "@/lib/utils";
 import { Avatar, Badge, Card } from "@/components/ui";
 import { ProfileForm, AvatarEditor } from "@/components/profile-form";
-import { SignOutButton } from "@/components/signout";
+import { SignOutButton } from "@/components/sign-out-button";
 import { InstallAppRow } from "@/components/install-app-row";
 
 export const dynamic = "force-dynamic";

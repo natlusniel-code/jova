@@ -132,7 +132,7 @@ export type GoogleAuthMode = "signin" | "signup";
  * not exist.
  */
 export async function signInWithGoogle(
-  opts: { mode?: GoogleAuthMode; role?: "buyer" | "seller" } = {},
+  opts: { mode?: GoogleAuthMode; role?: "buyer" | "seller"; next?: string } = {},
 ): Promise<void> {
   const { account } = appwrite();
 
@@ -141,6 +141,13 @@ export async function signInWithGoogle(
 
   const params = new URLSearchParams({ mode });
   if (mode === "signup") params.set("role", role);
+
+  // A deep link the person was bounced from (a listing, a chat, checkout).
+  // Only a same-origin relative path is carried, so this can never become an
+  // open redirect; the server re-checks it before navigating.
+  if (opts.next && opts.next.startsWith("/") && !opts.next.startsWith("//")) {
+    params.set("next", opts.next);
+  }
 
   const success = `${window.location.origin}/auth/success?${params.toString()}`;
   const failure = `${window.location.origin}/auth/failure`;
@@ -153,12 +160,21 @@ export async function signInWithGoogle(
 }
 
 /** Read the intent back off the success URL. Defaults to a plain sign-in. */
-export function readGoogleIntent(): { mode: GoogleAuthMode; role: "buyer" | "seller" } {
+export function readGoogleIntent(): {
+  mode: GoogleAuthMode;
+  role: "buyer" | "seller";
+  next: string | null;
+} {
   const url = new URL(window.location.href);
   const mode: GoogleAuthMode =
     url.searchParams.get("mode") === "signup" ? "signup" : "signin";
   const role = url.searchParams.get("role") === "seller" ? "seller" : "buyer";
-  return { mode, role };
+
+  // Same-origin relative paths only — never an absolute URL.
+  const raw = url.searchParams.get("next");
+  const next = raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : null;
+
+  return { mode, role, next };
 }
 
 /**

@@ -1,329 +1,39 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
-import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  accountHasPhone,
-  checkPassword,
-  createAccountUser,
-  emailTaken,
-  issueCode,
-  mintSession,
-  phoneMatches,
-  requestClient,
-  setPassword,
-  verifyCode,
-} from "@/lib/auth/local";
-import { postAuthDestination } from "@/lib/post-auth";
-import { isEmailVerified } from "@/lib/email/verify";
+import { requestClient } from "@/lib/auth/local";
 
 /**
- * Every sign-in, sign-up and reset action for the site.
+ * The remaining auth actions.
  *
- * All of them are Server Actions, so the password travels from the form to
- * this file over TLS and is never held in browser state, never put in a URL,
- * and never logged. The browser only ever receives a short result object.
+ * ── What used to be here ────────────────────────────────────────────────────
+ * `signInAction`, `startSignupAction`, `startResetAction` and
+ * `finishResetAction` — the whole email + password surface: password checks
+ * against `account_credentials`, the legacy-password migration, the
+ * "confirm your email" gate, and the phone-based password reset.
+ *
+ * All of it is gone. Google is the only way in, so there is no password to
+ * check, no account to create from a form, and no password to reset. The
+ * Appwrite OTP flow that briefly replaced the mailer is gone with it: no
+ * `createEmailToken`, no 6-digit code, no verification screen.
+ *
+ * What is left is the two things that are still real:
+ *   • `completeGoogleProfileAction` — the buyer's last step after Google,
+ *     which collects the phone number and LGA that Google does not provide;
+ *   • `signOutAction` — clearing the Supabase cookie.
  */
 
 export type ActionResult =
-  | { ok: true; next?: string; code?: string; email?: string }
-  | { ok: false; error: string; field?: string; code?: string; attemptsLeft?: number; email?: string };
+  | { ok: true; next?: string }
+  | { ok: false; error: string; field?: string };
 
-/** Only same-origin relative paths — never an absolute URL. */
-function safeNext(value: string | null | undefined): string | null {
-  if (!value) return null;
-  if (!value.startsWith("/") || value.startsWith("//")) return null;
-  return value;
-}
-
-function friendly(error: string): string {
-  switch (error) {
-    case "invalid":
-      return "That email and password don't match. Check the password, or reset it below.";
-    case "locked":
-      return "Too many wrong attempts. Wait a few minutes, then try again.";
-    case "banned":
-      return "This account has been suspended. Contact support if you think that's a mistake.";
-    default:
-      return "We couldn't sign you in. Please try again.";
-  }
-}
-
-/**
- * One-time migration for accounts that predate `account_credentials`.
- *
- * Those rows were backfilled with a hash that matches nothing, so `nm_login`
- * reports `no_credentials`. Rather than force every existing user through a
- * password reset, we ask Supabase once whether the password they just typed is
- * the one it has on file. If it is, we copy it into our own store and carry on
- * — the user notices nothing, and from then on their password is checked by us.
- *
- * This is the ONLY place Supabase still verifies a password, and it stops
- * being reachable for an account the moment that account has a real hash.
- */
-async function migrateLegacyPassword(
-  email: string,
-  password: string,
-): Promise<{ userId: string; email: string } | null> {
-  const legacy = createSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-
-  const { data, error } = await legacy.auth.signInWithPassword({ email, password });
-  if (error || !data.user?.email) return null;
-
-  await setPassword(data.user.id, data.user.email, password);
-  return { userId: data.user.id, email: data.user.email };
-}
-
-// ───────────────────────────────────────────────────────────────────────
-// sign in
-// ───────────────────────────────────────────────────────────────────────
-export async function signInAction(formData: FormData): Promise<ActionResult> {
-  const email = String(formData.get("email") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
-  const next = safeNext(String(formData.get("next") ?? ""));
-
-  if (!email) return { ok: false, error: "Enter your email address.", field: "email" };
-  if (!password) return { ok: false, error: "Enter your password.", field: "password" };
-
-  let userId: string;
-  let resolvedEmail = email;
-
-  try {
-    const verdict = await checkPassword(email, password);
-
-    if (verdict.ok) {
-      userId = verdict.userId;
-      resolvedEmail = verdict.email;
-    } else if (verdict.error === "no_credentials") {
-      const migrated = await migrateLegacyPassword(email, password);
-      if (!migrated) {
-        return { ok: false, error: friendly("invalid") };
-      }
-      userId = migrated.userId;
-      resolvedEmail = migrated.email;
-    } else {
-      return { ok: false, error: friendly(verdict.error) };
-    }
-
-    // ── The password is right — but is the address confirmed? ──────────────
-    // Checked AFTER the password, never before. Doing it first would let
-    // anyone discover which addresses have accounts by watching for the
-    // "not verified" message on a wrong password.
-    //
-    // Accounts created before this change were backfilled as verified in
-    // sql/0044, so this only ever catches a genuinely new, unconfirmed signup.
-    if (!(await isEmailVerified(resolvedEmail))) {
-      return {
-        ok: false,
-        error:
-          "Please confirm your email address first. We have sent you a link — open it, then sign in.",
-        field: "email",
-        email: resolvedEmail,
-      };
-    }
-
-    await mintSession(resolvedEmail);
-  } catch (e) {
-    console.error("[auth] sign-in failed", e);
-    return { ok: false, error: "We couldn't sign you in. Please try again." };
-  }
-
-  // Where to land is decided from the database, not from the form: a seller
-  // goes to the Seller Hub (or onboarding), a buyer to the storefront.
-  let destination = "/";
-  try {
-    const supabase = requestClient();
-    destination = await postAuthDestination(supabase, userId, next);
-  } catch {
-    destination = next ?? "/";
-  }
-
-  return { ok: true, next: destination };
-}
-
-// ───────────────────────────────────────────────────────────────────────
-// sign up — step 1: create the account and show a code
-// ───────────────────────────────────────────────────────────────────────
-export async function startSignupAction(formData: FormData): Promise<ActionResult> {
-  const fullName = String(formData.get("full_name") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const phone = String(formData.get("phone") ?? "").replace(/\s/g, "");
-  const password = String(formData.get("password") ?? "");
-  const state = String(formData.get("state") ?? "").trim();
-  const city = String(formData.get("city") ?? "").trim();
-  const role = String(formData.get("role") ?? "buyer") === "seller" ? "seller" : "buyer";
-
-  if (fullName.length < 3) return { ok: false, error: "Enter your full name.", field: "full_name" };
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email))
-    return { ok: false, error: "Enter a valid email address.", field: "email" };
-  if (!/^0\d{10}$/.test(phone))
-    return { ok: false, error: "Use 11 digits, like 08012345678.", field: "phone" };
-  if (password.length < 8)
-    return { ok: false, error: "Use at least 8 characters.", field: "password" };
-
-  try {
-    if (await emailTaken(email)) {
-      return { ok: false, error: "That email is already registered. Try signing in.", field: "email" };
-    }
-
-    const userId = await createAccountUser({ email, fullName, phone, state, city, role });
-    await setPassword(userId, email, password);
-
-    // ── The verification code is sent by the browser, not here ────────────
-    // Appwrite mails the 6-digit code, and the call that asks for it
-    // (`createEmailToken`) has to come from the browser: Appwrite binds the
-    // code to our origin through the `OTP-Token` header, which it can only
-    // read from a real browser request. A Server Action sends no `Origin`,
-    // so the code would arrive without autofill and without that binding.
-    //
-    // So this action stops at "account created". The client redirects to
-    // /signup/verify, which sends the first code on mount and shows the
-    // entry box. Nothing here can fail because a mail provider is missing —
-    // there is no mail provider in this app any more.
-    return { ok: true, email };
-  } catch (e) {
-    console.error("[auth] signup failed", e);
-    return {
-      ok: false,
-      error: "We couldn't create your account just now. Please try again.",
-    };
-  }
-}
-
-// ───────────────────────────────────────────────────────────────────────
-// sign up — step 2: the person types the code Appwrite emailed them
-// ─────────────────────────────────────────────────────────────────────────
-// There is no server action for sending or checking the code any more.
-//
-// Sending is `createEmailToken` in the browser (src/lib/appwrite/otp.ts) and
-// checking is `createSession` with the typed code, also in the browser. Both
-// need only the public project ID, and doing them client-side is what lets
-// Appwrite bind the code to our origin for autofill.
-//
-// The one thing that must stay on the server is writing the verified flag to
-// Supabase, because that needs the service role. That is
-// `confirmEmailCodeAction` in ./verify-code-action.ts, which verifies the
-// Appwrite JWT before it writes anything.
-//
-// The old `resendVerificationAction` is gone with the link flow it served.
-
-// ───────────────────────────────────────────────────────────────────────
-// password reset — no email, so the phone number on the account is the
-// second factor. Two recorded details, not one.
-// ───────────────────────────────────────────────────────────────────────
-export async function startResetAction(formData: FormData): Promise<ActionResult> {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const phone = String(formData.get("phone") ?? "").replace(/\s/g, "");
-
-  if (!email) return { ok: false, error: "Enter your email address.", field: "email" };
-
-  try {
-    if (!(await emailTaken(email))) {
-      // Same message as a wrong phone, so this form cannot be used to discover
-      // which addresses have accounts.
-      return {
-        ok: false,
-        error: "That email and phone number don't match an account.",
-        field: "email",
-      };
-    }
-
-    // The phone number is the only real check here: the code is displayed on
-    // screen, so it proves nothing on its own. But it must never lock out a
-    // legitimate user, so it is only enforced when the account actually has a
-    // phone on record. An account with no phone falls through to the code.
-    const hasPhone = await phoneMatches(email, phone);
-    if (!hasPhone && phone) {
-      return {
-        ok: false,
-        error: "That email and phone number don't match an account.",
-        field: "phone",
-      };
-    }
-    if (!hasPhone && !phone) {
-      const recorded = await accountHasPhone(email);
-      if (recorded) {
-        return {
-          ok: false,
-          error: "Enter the phone number on your account.",
-          field: "phone",
-        };
-      }
-    }
-
-    const code = await issueCode(email, "reset");
-    return { ok: true, code, email };
-  } catch (e) {
-    console.error("[auth] reset start failed", e);
-    return { ok: false, error: "We couldn't start a reset just now. Please try again." };
-  }
-}
-
-export async function finishResetAction(formData: FormData): Promise<ActionResult> {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const code = String(formData.get("code") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
-
-  if (!/^\d{6}$/.test(code)) {
-    return { ok: false, error: "Enter the 6-digit code shown above.", field: "code" };
-  }
-  if (password.length < 8) {
-    return { ok: false, error: "Use at least 8 characters.", field: "password" };
-  }
-
-  try {
-    const verdict = await verifyCode(email, code, "reset");
-    if (!verdict.ok) {
-      if (verdict.error === "mismatch") {
-        return {
-          ok: false,
-          error: "That code doesn't match. Here's a new one — type it in.",
-          code: verdict.rotatedCode,
-          attemptsLeft: verdict.attemptsLeft,
-        };
-      }
-      return { ok: false, error: "That code is no longer valid. Start the reset again." };
-    }
-
-    const admin = createAdminClient();
-    const { data: prof } = await admin
-      .from("profiles")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-
-    if (!prof?.id) return { ok: false, error: "We couldn't find that account." };
-
-    await setPassword(prof.id, email, password);
-    await mintSession(email);
-
-    return { ok: true, next: "/" };
-  } catch (e) {
-    console.error("[auth] password reset failed", e);
-    return {
-      ok: false,
-      error: "We couldn't reset your password just now. Please try again.",
-    };
-  }
-}
-
-// ───────────────────────────────────────────────────────────────────────
-// sign out
-// ───────────────────────────────────────────────────────────────────────
-// ───────────────────────────────────────────────────────────────────────
-// Google signup — the buyer's last step
-// ───────────────────────────────────────────────────────────────────────
 /**
  * Save the phone number and local government a Google buyer still needs.
  *
  * Google gives us a name and a verified email and nothing else. This writes
- * the two fields the marketplace actually depends on: the phone (the
- * password-reset factor) and the state/LGA (which decides which sellers the
- * buyer can order from).
+ * the two fields the marketplace actually depends on: the phone (how a seller
+ * or support reaches them about an order) and the state/LGA (which decides
+ * which sellers the buyer can order from).
  *
  * It writes to `profiles` through the request client, so RLS applies and the
  * row can only be the caller's own — the id is never taken from the form.
@@ -388,6 +98,13 @@ export async function completeGoogleProfileAction(
   }
 }
 
+/**
+ * Clear the Supabase session cookie and go home.
+ *
+ * The Appwrite session is cleared separately in the browser by
+ * `signOutOfAppwrite()` — see `src/components/sign-out-button.tsx`, which is
+ * the only sign-out control now that the password flow is gone.
+ */
 export async function signOutAction(): Promise<void> {
   const supabase = requestClient();
   await supabase.auth.signOut();

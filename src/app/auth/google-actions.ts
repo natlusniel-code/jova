@@ -38,11 +38,17 @@ export async function bridgeGoogleSession(input: {
   jwt: string;
   mode?: "signin" | "signup";
   role?: "buyer" | "seller";
+  next?: string | null;
 }): Promise<GoogleBridgeResult> {
   const claimedId = String(input?.userId ?? "").trim();
   const jwt = String(input?.jwt ?? "").trim();
   const mode = input?.mode === "signup" ? "signup" : "signin";
   const role = input?.role === "seller" ? "seller" : "buyer";
+
+  // Only a same-origin relative path — never an absolute URL.
+  const rawNext = String(input?.next ?? "");
+  const next =
+    rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
 
   if (!claimedId || !jwt) {
     return { ok: false, error: "The sign-in did not complete. Please try again." };
@@ -64,14 +70,20 @@ export async function bridgeGoogleSession(input: {
   }
 
   // ── 2. Find or create the Supabase account ───────────────────────────────
-  // `allowCreate` is the whole difference between the two entry points:
-  //   signin — the account must already exist, so the login page cannot be
-  //            used to silently create accounts.
-  //   signup — create it, with the role the person chose.
+  // With email sign-up removed, Google is the ONLY way to create an account,
+  // so creation is always allowed. There is no longer a "the login page must
+  // not create accounts" rule to enforce, because there is no separate login
+  // page: `/auth` is both doors at once.
+  //
+  // The important half is the LOOKUP, not the create. `findOrCreateSupabaseUser`
+  // matches on email, so someone who signed up with a password before Google
+  // was added — and whose address is the same as their Google account — is
+  // handed back their EXISTING Supabase user id. Same profile, same role, same
+  // orders and chats. No duplicate account is created.
   let resolved: { userId: string; email: string; created: boolean } | null;
   try {
     resolved = await findOrCreateSupabaseUser(appwriteUser, {
-      allowCreate: mode === "signup",
+      allowCreate: true,
       role,
     });
   } catch (e) {
@@ -112,7 +124,7 @@ export async function bridgeGoogleSession(input: {
   // A brand-new Google signup has not given us a phone number or an LGA yet,
   // and a seller has a whole onboarding flow to finish. Both must be sent to
   // the step that collects what is missing — never straight to a dashboard.
-  if (mode === "signup" && resolved.created) {
+  if (resolved.created) {
     if (role === "seller") {
       // Verification → shop creation → plan payment → approval. The seller
       // hub is gated on an approved shop, so this is the only correct entry.
@@ -123,14 +135,15 @@ export async function bridgeGoogleSession(input: {
     return { ok: true, next: "/signup/complete" };
   }
 
-  // An existing account — or a sign-in — follows the same role rules the
-  // password flow uses. The database decides, not the client.
+  // An existing account follows the same role rules the marketplace already
+  // uses, with the requested page winning when there is one. The database
+  // decides the role, not the client.
   let destination = "/dashboard";
   try {
     const supabase = requestClient();
-    destination = await postAuthDestination(supabase, resolved.userId, null);
+    destination = await postAuthDestination(supabase, resolved.userId, next);
   } catch {
-    destination = "/dashboard";
+    destination = next ?? "/dashboard";
   }
 
   return { ok: true, next: destination };

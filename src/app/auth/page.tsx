@@ -1,13 +1,12 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { AuthSplit } from "@/components/auth-split";
 import { getSession } from "@/lib/supabase/server";
-import { AuthGooglePanel } from "@/components/auth-google-panel";
+import { GoogleAuthPanel } from "@/components/google-auth-panel";
 
 export const metadata = { title: "Sign in" };
 
 /**
- * `/auth` — the signed-out auth screen.
+ * `/auth` — the single entry point into NaijaMart.
  *
  * ── The guard ───────────────────────────────────────────────────────────────
  * `getSession()` runs on the server BEFORE anything renders. If the visitor
@@ -15,19 +14,35 @@ export const metadata = { title: "Sign in" };
  * never sees a sign-in screen. Doing this server-side (rather than in a
  * `useEffect`) means there is no flash of the auth UI before the redirect.
  *
- * ── Why it reuses AuthSplit ─────────────────────────────────────────────────
- * The brief says keep the existing design, fonts and colours. AuthSplit is the
- * same two-panel shell the password sign-in uses — brand panel on the left,
- * form on the right, collapsing to a single column on mobile — so this page
- * looks like it was always part of the site.
+ * ── Why this is now the only auth page ──────────────────────────────────────
+ * Email sign-up, email sign-in, the verification code and the password reset
+ * have all been removed. Google is the only identity provider, so there is one
+ * screen, one action, and no reason to split "sign in" from "sign up" — the
+ * server creates the account if it is new and reuses it if it is not.
+ *
+ * `/signin` and `/signup` still exist as thin redirects to this page, because
+ * they are linked from dozens of places (every `redirect("/signin?next=…")`
+ * guard, old emails, bookmarks). Redirecting keeps those links working without
+ * leaving a second, half-dead auth surface in the app.
  */
-export default async function AuthPage() {
+export default async function AuthPage({
+  searchParams,
+}: {
+  searchParams?: { next?: string; role?: string };
+}) {
   const session = await getSession();
   if (session) redirect("/dashboard");
 
+  // Only a same-origin relative path is carried through the OAuth round trip.
+  const raw = searchParams?.next ?? "";
+  const next = raw.startsWith("/") && !raw.startsWith("//") ? raw : undefined;
+
+  // A seller link (`/signup?role=seller`) preselects the seller card.
+  const initialRole = searchParams?.role === "seller" ? "seller" : "buyer";
+
   return (
     <AuthSplit>
-      <AuthGooglePanel />
+      <GoogleAuthPanel next={next} initialRole={initialRole} />
     </AuthSplit>
   );
 }

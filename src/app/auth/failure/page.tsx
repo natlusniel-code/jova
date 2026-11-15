@@ -47,8 +47,8 @@ export default function AuthFailurePage({
           Google sign-in did not complete
         </h1>
         <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-500">
-          Nothing was charged and no account was changed. You can try again, or
-          sign in with your email and password.
+          Nothing was charged and no account was changed. You can try again with
+          Google whenever you&apos;re ready.
         </p>
 
         <div className="mt-4">
@@ -65,8 +65,8 @@ export default function AuthFailurePage({
           <Link href="/auth" className="nm-btn-primary w-full py-3">
             Try again
           </Link>
-          <Link href="/signin" className="nm-btn-ghost w-full py-3">
-            Sign in with email and password
+          <Link href="/" className="nm-btn-ghost w-full py-3">
+            Back to the marketplace
           </Link>
         </div>
       </div>

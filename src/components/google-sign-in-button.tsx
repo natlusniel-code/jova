@@ -45,19 +45,21 @@ export function GoogleSignInButton({
   onError,
   mode = "signin",
   role,
+  next,
 }: {
   label?: string;
   className?: string;
   onError?: (message: string) => void;
   mode?: GoogleAuthMode;
   role?: "buyer" | "seller";
+  next?: string;
 }) {
   const [busy, setBusy] = useState(false);
 
   async function handleClick() {
     setBusy(true);
     try {
-      await signInWithGoogle({ mode, role });
+      await signInWithGoogle({ mode, role, next });
       // If we get here the browser is already navigating to Google. Leave the
       // spinner up: coming back to a button that flickered to "idle" would look
       // like the click did nothing.
