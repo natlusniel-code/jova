@@ -7,21 +7,27 @@
  * holds a privileged key. Each action returns a plain `{ ok, error }` result
  * instead of throwing, because the calling components render the message inline.
  *
- * Why not call the `admin_*` RPCs from the browser any more: those RPCs open with
- * `if not public.is_admin() then raise exception 'Admins only.'` — and an
- * anonymous caller is never an admin. Reading them through the service role
- * keeps the guard meaningful (the key itself is the authorisation) instead of
- * deleting the check from the database.
+ * ── Why every action opens with `requireAdmin()` ──────────────────────────
+ * The console's pages are gated by middleware, but a Server Action is its own
+ * HTTP endpoint: it can be invoked directly, without ever rendering the page
+ * that contains the button. Gating only the page protects the view and not the
+ * mutation — and these mutations verify payments, release payouts, ban buyers
+ * and change platform settings. So each action re-checks the `admin_users` row
+ * itself, through the same helper the middleware uses.
  *
- * The RPCs are still used where they carry real business logic — they are just
- * invoked server-side, where `auth.uid()` is null and `is_admin()` therefore
- * returns false. So each action below either calls the RPC *through a client that
- * is allowed to bypass that guard* or performs the equivalent write directly.
- * For the RPCs guarded by `is_admin()`, direct writes are used and the business
- * rules they enforced are reproduced explicitly.
+ * ── Why the service role ─────────────────────────────────────────────────
+ * The `admin_*` RPCs open with `if not public.is_admin()`, and a server action
+ * has no `auth.uid()`. The key itself is the authorisation, and it never
+ * reaches the browser. The RPCs are still used where they carry real business
+ * logic — they are just invoked server-side, where `is_admin()` returns false.
+ * So each action below either calls the RPC through a client that is allowed
+ * to bypass that guard, or performs the equivalent write directly. For the
+ * RPCs guarded by `is_admin()`, direct writes are used and the business rules
+ * they enforced are reproduced explicitly.
  */
 import { revalidatePath } from "next/cache";
 import { createAdminClient, hasAdminKey } from "@/lib/supabase/admin";
+import { requireAdmin } from "@/lib/admin-guard";
 
 export type ActionResult = { ok: boolean; error?: string };
 
@@ -56,14 +62,16 @@ function refreshAdmin(extra?: string[]) {
   }
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────────
  * Payments — verify or reject a buyer's transfer receipt (the escrow gate)
- * ──────────────────────────────────────────────────────────────────────────── */
+ * ────────────────────────────────────────────────────────────────────────── */
 export async function verifyPayment(
   paymentId: string,
   approve: boolean,
   reason?: string,
 ): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
   if (!approve && !reason?.trim()) {
     return { ok: false, error: "A reason is required when rejecting." };
@@ -234,13 +242,15 @@ export async function verifyPayment(
   }
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────────
  * Payouts
- * ──────────────────────────────────────────────────────────────────────────── */
+ * ────────────────────────────────────────────────────────────────────────── */
 export async function markPayoutPaid(
   payoutId: string,
   reference?: string,
 ): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   try {
@@ -281,14 +291,16 @@ export async function markPayoutPaid(
   }
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────────
  * Disputes
- * ──────────────────────────────────────────────────────────────────────────── */
+ * ────────────────────────────────────────────────────────────────────────── */
 export async function resolveDispute(
   disputeId: string,
   outcome: "resolved_buyer" | "resolved_seller",
   note: string,
 ): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
   if (note.trim().length < 5) {
     return { ok: false, error: "Add a one-line resolution note." };
@@ -371,15 +383,17 @@ export async function resolveDispute(
   }
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────────
  * Sellers
- * ──────────────────────────────────────────────────────────────────────────── */
+ * ────────────────────────────────────────────────────────────────────────── */
 export async function setShopStatus(
   shopId: string,
   status: "pending" | "approved" | "suspended" | "rejected",
   note?: string | null,
   verified?: boolean | null,
 ): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
   if (status !== "approved" && !note?.trim()) {
     return { ok: false, error: "Write a short message — the seller receives it." };
@@ -435,6 +449,8 @@ export async function toggleShopSuspend(
   shopId: string,
   suspended: boolean,
 ): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   try {
@@ -458,13 +474,15 @@ export async function toggleShopSuspend(
   }
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────────
  * Reviews
- * ──────────────────────────────────────────────────────────────────────────── */
+ * ────────────────────────────────────────────────────────────────────────── */
 export async function moderateReview(
   reviewId: string,
   status: "published" | "hidden",
 ): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   try {
@@ -478,10 +496,12 @@ export async function moderateReview(
   }
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────────
  * Buyers
- * ──────────────────────────────────────────────────────────────────────────── */
+ * ────────────────────────────────────────────────────────────────────────── */
 export async function setBuyerBanned(profileId: string, banned: boolean): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   try {
@@ -498,9 +518,9 @@ export async function setBuyerBanned(profileId: string, banned: boolean): Promis
   }
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────────
  * Platform settings
- * ──────────────────────────────────────────────────────────────────────────── */
+ * ────────────────────────────────────────────────────────────────────────── */
 export async function saveSettings(input: {
   commission_rate: number;
   subscription_price: number;
@@ -508,6 +528,8 @@ export async function saveSettings(input: {
   free_delivery_default: number;
   terms_text: string;
 }): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   if (!Number.isFinite(input.commission_rate) || input.commission_rate < 0 || input.commission_rate > 1) {
@@ -535,9 +557,6 @@ export async function saveSettings(input: {
   }
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
- * Categories
- * ──────────────────────────────────────────────────────────────────────────── */
 /* ──────────────────────────────────────────────────────────────────────────
  * General notifications (broadcast)
  *
@@ -569,6 +588,8 @@ export async function sendBroadcast(input: {
   audience: BroadcastAudience;
   href?: string;
 }): Promise<BroadcastResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   const title = input.title.trim();
@@ -647,6 +668,8 @@ export async function sendBroadcast(input: {
 }
 
 export async function addCategory(name: string, slug: string, sortOrder: number): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
   if (name.trim().length < 2) return { ok: false, error: "Give the category a name." };
 
@@ -667,6 +690,8 @@ export async function addCategory(name: string, slug: string, sortOrder: number)
 }
 
 export async function toggleCategory(id: string, active: boolean): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   try {

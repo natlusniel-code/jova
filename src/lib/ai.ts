@@ -1,7 +1,7 @@
 /**
  * The server-side AI client.
  *
- * ── Why this is separate from `ai-listing.ts` ────────────────────────────
+ * ── Why this is separate from `ai-listing.ts` ─────────────────────────────
  * `ai-listing.ts` runs in the BROWSER: it reads the seller's photo with a
  * canvas and calls Gemini directly, which means its key ships in the client
  * bundle. That was a deliberate, temporary choice for one feature. Every
@@ -9,16 +9,15 @@
  * quality analysis, the admin copilot and the seller auto-reply all read
  * data a browser must never see (other buyers' history, every shop's
  * numbers, the block list). So they run on the server, and the key is read
- * from the environment with the same literal fallback the rest of the repo
- * uses, so a host without env vars still works.
+ * from the environment only.
  *
- * ── Why one client ───────────────────────────────────────────────────────
+ * ── Why one client ────────────────────────────────────────────────────────
  * Seven features, one transport. Timeouts, the fallback model, JSON
  * repair, rate-limit handling and the "is the AI even configured?" check
  * are written once here. A feature that needs a new shape adds a prompt,
  * not a second HTTP client.
  *
- * ── Why `fast` exists ────────────────────────────────────────────────────
+ * ── Why `fast` exists ─────────────────────────────────────────────────────
  * Voice and image search must feel instant. They use the lite model with a
  * short timeout and a hard cap on output tokens, because a search that
  * takes 8 seconds is worse than one that returns slightly rougher terms.
@@ -30,19 +29,25 @@ import "server-only";
 /* ------------------------------------------------------------------ config */
 
 /**
- * The key, in two pieces for the same reason as `ai-listing.ts`: GitHub's
- * push protection refuses a commit containing a literal Google API key.
- * The two halves are adjacent and the joined value is the key.
+ * The key.
+ *
+ * Read from the environment only — there is no committed fallback any more.
+ * A literal key in the repo is a key that has to be rotated the moment the
+ * repo is read by anyone, and this module is server-only, so the environment
+ * is the right and only place for it.
+ *
+ * `GEMINI_API_KEY` wins. `NEXT_PUBLIC_GEMINI_KEY` is the fallback so a host
+ * that has not been updated yet keeps working; reading a `NEXT_PUBLIC_`
+ * variable here does NOT expose it, because this file is `server-only` and
+ * never enters a client bundle.
  */
-const KEY_PART_1 = "REDACTED_GEMINI_KEY_PART_1";
-const KEY_PART_2 = "REDACTED_GEMINI_KEY_PART_2";
-
-export const AI_KEY = process.env.GEMINI_API_KEY?.trim() || KEY_PART_1 + KEY_PART_2;
+export const AI_KEY =
+  process.env.GEMINI_API_KEY?.trim() || process.env.NEXT_PUBLIC_GEMINI_KEY?.trim() || "";
 
 /**
  * The model that thinks.
  *
- * ── Why not `gemini-flash-latest` ─────────────────────────────────────
+ * ── Why not `gemini-flash-latest` ─────────────────────────────────────────
  * That alias was the original default and it is not usable here: it
  * answers 429 RESOURCE_EXHAUSTED on this key, and when it does answer it
  * takes 6–10s. Because `call()` retries the fallback on a network error,

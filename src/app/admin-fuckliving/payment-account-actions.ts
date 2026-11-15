@@ -3,7 +3,7 @@
 /**
  * Payment-account writes for the admin console.
  *
- * ── Why this file exists ─────────────────────────────────────────────────────
+ * ── Why this file exists ──────────────────────────────────────────────────
  * The payment-accounts page used to call
  * `supabase.rpc("admin_save_payment_account", …)` and
  * `supabase.rpc("admin_delete_payment_account", …)` straight from the browser.
@@ -12,7 +12,7 @@
  *     if not public.is_admin() then raise exception 'Admins only.'; end if;
  *
  * and `public.is_admin()` is true only when the caller has a row in
- * `public.admin_users`. The console itself has no sign-in gate — it reads
+ * `public.admin_users`. The console itself had no sign-in gate — it read
  * through the service role — so a signed-in admin whose account was never
  * inserted into `admin_users` (or every admin at all, on a project where that
  * table is empty) got "Admins only." on every save and nothing was written.
@@ -23,9 +23,14 @@
  * the three required fields, and deactivate-instead-of-delete when an order
  * already references the account, so order history keeps a real row to point
  * at.
+ *
+ * ── Why `requireAdmin()` is the first line ────────────────────────────────
+ * A Server Action is its own endpoint. The middleware gate covers the page,
+ * not this mutation, so the admin check is repeated here.
  */
 import { revalidatePath } from "next/cache";
 import { createAdminClient, hasAdminKey } from "@/lib/supabase/admin";
+import { requireAdmin } from "@/lib/admin-guard";
 
 /** Same `{ ok, error }` shape `actions.ts` returns, declared here so this
  *  module is self-contained (a bundled server action must own its types). */
@@ -65,6 +70,8 @@ export type PaymentAccountInput = {
 export async function savePaymentAccount(
   input: PaymentAccountInput,
 ): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   const bankName = (input.bank_name ?? "").trim();
@@ -114,6 +121,8 @@ export async function savePaymentAccount(
 
 /** Remove an account — deactivating it instead when an order used it. */
 export async function deletePaymentAccount(id: string): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   try {

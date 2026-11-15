@@ -9,6 +9,13 @@
  * failure mode (a bad price, a model that is down), so they live here and
  * are imported by the components that need them.
  *
+ * ── Why every action opens with `requireAdmin()` ─────────────────────────
+ * A Server Action is its own HTTP endpoint: it can be invoked directly,
+ * without ever rendering the page that contains the button. The middleware
+ * gate protects the console's pages, not these mutations — and these
+ * mutations change plan prices, grant Premium and run paid model calls. So
+ * each action re-checks the `admin_users` row itself.
+ *
  * ── Why the service role ─────────────────────────────────────────────────
  * Same reason as `actions.ts`: the `admin_*` RPCs open with
  * `if not public.is_admin()`, and a server action has no `auth.uid()`. The
@@ -17,6 +24,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient, hasAdminKey } from "@/lib/supabase/admin";
+import { requireAdmin } from "@/lib/admin-guard";
 import { checkListing, checkShop, checkReview } from "@/lib/ai-safety";
 import { analyseShopQuality } from "@/lib/ai-quality";
 import { generateSellerInsights } from "@/lib/ai-seller-insights";
@@ -37,9 +45,9 @@ function fail(error: unknown): ActionResult {
   return { ok: false, error: message };
 }
 
-/* ────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────────
  * Seller plans
- * ──────────────────────────────────────────────────────────────────────── */
+ * ────────────────────────────────────────────────────────────────────────── */
 
 /**
  * Save a plan's price and tagline.
@@ -53,6 +61,8 @@ export async function saveSellerPlan(input: {
   price: number;
   tagline: string;
 }): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   if (!["basic", "premium"].includes(input.id)) {
@@ -104,6 +114,8 @@ export async function confirmSubscription(input: {
   shopId: string;
   days?: number;
 }): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   const days = input.days ?? 30;
@@ -129,15 +141,17 @@ export async function confirmSubscription(input: {
   }
 }
 
-/* ────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────────
  * Trust & safety
- * ──────────────────────────────────────────────────────────────────────── */
+ * ────────────────────────────────────────────────────────────────────────── */
 
 /** Run a safety check on one subject and store the report. */
 export async function runSafetyCheck(input: {
   subjectType: "listing" | "shop" | "review";
   subjectId: string;
 }): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   try {
@@ -164,6 +178,8 @@ export async function setSafetyReportStatus(input: {
   id: string;
   status: "open" | "reviewed" | "actioned" | "dismissed";
 }): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   try {
@@ -184,12 +200,14 @@ export async function setSafetyReportStatus(input: {
   }
 }
 
-/* ────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────────
  * Quality + insights
- * ──────────────────────────────────────────────────────────────────────── */
+ * ────────────────────────────────────────────────────────────────────────── */
 
 /** Re-run the quality analysis for a shop. */
 export async function refreshShopQuality(shopId: string): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   try {
@@ -207,6 +225,8 @@ export async function refreshShopQuality(shopId: string): Promise<ActionResult> 
 
 /** Re-generate the AI insights for a shop. */
 export async function refreshSellerInsights(shopId: string): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   try {
@@ -221,9 +241,9 @@ export async function refreshSellerInsights(shopId: string): Promise<ActionResul
   }
 }
 
-/* ────────────────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────────────────
  * Copilot
- * ──────────────────────────────────────────────────────────────────────── */
+ * ────────────────────────────────────────────────────────────────────────── */
 
 /**
  * Ask the copilot a question.
@@ -243,6 +263,8 @@ export async function askAdminCopilot(input: {
   schemaAsOf?: string;
   error?: string;
 }> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   try {
@@ -275,6 +297,8 @@ export async function getCopilotCapabilities(): Promise<{
   asOf?: string | null;
   error?: string;
 }> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
   try {

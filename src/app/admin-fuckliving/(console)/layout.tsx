@@ -7,10 +7,11 @@ import Link from "next/link";
 /**
  * Admin console shell.
  *
- * There is deliberately NO auth gate here — /admin-fuckliving loads directly, as
- * requested. That is safe only because the data is fetched server-side with the
- * service-role key (see `src/lib/supabase/admin.ts`) and the browser never
- * receives that key.
+ * The auth gate is in `src/middleware.ts`, not here: no session redirects to
+ * `/admin-fuckliving/login`, and a session that is not in `admin_users` gets a
+ * 404. Every Server Action in this folder re-checks the same row through
+ * `requireAdmin()` (`src/lib/admin-guard.ts`), because an action is its own
+ * endpoint and can be called without ever rendering this layout.
  *
  * `force-dynamic` is required: every admin page shows live business numbers, so
  * nothing here may be statically cached at build time.
