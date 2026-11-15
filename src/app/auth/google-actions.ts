@@ -4,7 +4,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { mintSession } from "@/lib/auth/local";
 import { postAuthDestination } from "@/lib/post-auth";
 import { requestClient } from "@/lib/auth/local";
-import { findOrCreateSupabaseUser, verifyAppwriteJwt } from "@/lib/appwrite/server";
+import {
+  findOrCreateSupabaseUser,
+  NoAccountError,
+  verifyAppwriteJwt,
+} from "@/lib/appwrite/server";
 
 /**
  * Bridge an Appwrite (Google) sign-in into a Supabase session.
@@ -27,14 +31,18 @@ import { findOrCreateSupabaseUser, verifyAppwriteJwt } from "@/lib/appwrite/serv
 
 export type GoogleBridgeResult =
   | { ok: true; next: string }
-  | { ok: false; error: string };
+  | { ok: false; error: string; noAccount?: boolean };
 
 export async function bridgeGoogleSession(input: {
   userId: string;
   jwt: string;
+  mode?: "signin" | "signup";
+  role?: "buyer" | "seller";
 }): Promise<GoogleBridgeResult> {
   const claimedId = String(input?.userId ?? "").trim();
   const jwt = String(input?.jwt ?? "").trim();
+  const mode = input?.mode === "signup" ? "signup" : "signin";
+  const role = input?.role === "seller" ? "seller" : "buyer";
 
   if (!claimedId || !jwt) {
     return { ok: false, error: "The sign-in did not complete. Please try again." };
@@ -56,10 +64,20 @@ export async function bridgeGoogleSession(input: {
   }
 
   // ── 2. Find or create the Supabase account ───────────────────────────────
+  // `allowCreate` is the whole difference between the two entry points:
+  //   signin — the account must already exist, so the login page cannot be
+  //            used to silently create accounts.
+  //   signup — create it, with the role the person chose.
   let resolved: { userId: string; email: string; created: boolean } | null;
   try {
-    resolved = await findOrCreateSupabaseUser(appwriteUser);
+    resolved = await findOrCreateSupabaseUser(appwriteUser, {
+      allowCreate: mode === "signup",
+      role,
+    });
   } catch (e) {
+    if (e instanceof NoAccountError) {
+      return { ok: false, error: e.message, noAccount: true };
+    }
     return {
       ok: false,
       error:
@@ -91,7 +109,22 @@ export async function bridgeGoogleSession(input: {
   }
 
   // ── 4. Where to land ─────────────────────────────────────────────────────
-  // Same rule as the password flow: the database decides, not the client.
+  // A brand-new Google signup has not given us a phone number or an LGA yet,
+  // and a seller has a whole onboarding flow to finish. Both must be sent to
+  // the step that collects what is missing — never straight to a dashboard.
+  if (mode === "signup" && resolved.created) {
+    if (role === "seller") {
+      // Verification → shop creation → plan payment → approval. The seller
+      // hub is gated on an approved shop, so this is the only correct entry.
+      return { ok: true, next: "/seller/onboarding?step=1" };
+    }
+    // Buyer: collect the local government and phone number before anything
+    // else. `next` carries them to the storefront afterwards.
+    return { ok: true, next: "/signup/complete" };
+  }
+
+  // An existing account — or a sign-in — follows the same role rules the
+  // password flow uses. The database decides, not the client.
   let destination = "/dashboard";
   try {
     const supabase = requestClient();

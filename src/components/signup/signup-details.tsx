@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { startSignupAction } from "@/app/auth/actions";
 import { NIGERIA_STATES, lgasFor, cn } from "@/lib/utils";
 import { Spinner, Alert } from "@/components/ui";
+import { GoogleSignInButton } from "@/components/google-sign-in-button";
 
 type Props = { initialRole: "buyer" | "seller" };
 
@@ -21,9 +22,10 @@ function passwordScore(pw: string) {
 /**
  * Signup step 2 — details.
  *
- * No email is sent. `startSignupAction` creates the account, stores the
- * password in our own credential table, and returns a 6-digit code which the
- * next screen displays for the user to retype. See sql/0015.
+ * `startSignupAction` creates the account, stores the password in our own
+ * credential table, and emails a confirmation link. The next screen only tells
+ * the person to open it — there is no code to retype any more, because a code
+ * shown on screen proves nothing about who can read the inbox.
  */
 export function SignupDetails({ initialRole }: Props) {
   const router = useRouter();
@@ -79,12 +81,12 @@ export function SignupDetails({ initialRole }: Props) {
         else setErrors({ form: result.error });
         return;
       }
-      // The code is shown on the next screen. It is passed in the URL because
-      // it must survive a refresh — it is a one-time code for an account that
-      // was just created in this same browser, not a secret credential.
+      // The account is created and the verification link has been emailed.
+      // The next screen only tells them to open it — there is no code to show
+      // any more, because a code on screen proves nothing about the inbox.
       router.push(
         `/signup/verify?email=${encodeURIComponent(result.email ?? form.email.trim())}` +
-          `&role=${role}&code=${encodeURIComponent(result.code ?? "")}`,
+          `&role=${role}`,
       );
     });
   }
@@ -114,7 +116,31 @@ export function SignupDetails({ initialRole }: Props) {
         <Link href="/signup" className="font-semibold text-brand-600 hover:underline">Change</Link>
       </p>
 
-      <form onSubmit={submit} className="mt-5 space-y-3.5" noValidate>
+      {/* ── Continue with Google ────────────────────────────────────────────
+          The fastest way to sign up: Google gives us the name and a verified
+          email, so the form below is skipped entirely.
+
+          mode="signup" is what makes this different from the login page — the
+          server is allowed to CREATE the account here, with the role the
+          person picked. Where they land next depends on that role:
+            buyer  → /signup/complete, to collect LGA + phone
+            seller → /seller/onboarding, to do verification, shop and payment
+          Neither goes to a dashboard, because neither has finished yet. */}
+      <div className="mt-5">
+        <GoogleSignInButton
+          mode="signup"
+          role={role}
+          label="Continue with Google"
+          onError={(m) => setErrors({ form: m })}
+        />
+        <div className="mt-4 flex items-center gap-3">
+          <span className="h-px flex-1 bg-[var(--line)]" />
+          <span className="text-[12px] font-medium text-ink-400">or use your email</span>
+          <span className="h-px flex-1 bg-[var(--line)]" />
+        </div>
+      </div>
+
+      <form onSubmit={submit} className="mt-4 space-y-3.5" noValidate>
         <div>
           <label className="nm-label" htmlFor="full_name">Full name</label>
           <input

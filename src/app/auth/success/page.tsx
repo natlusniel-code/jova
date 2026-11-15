@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { completeOAuthSignIn, createAppwriteJwt, signOutOfAppwrite } from "@/lib/appwrite/client";
+import { completeOAuthSignIn, createAppwriteJwt, readGoogleIntent, signOutOfAppwrite } from "@/lib/appwrite/client";
 import { bridgeGoogleSession } from "@/app/auth/google-actions";
 import { Spinner, Alert } from "@/components/ui";
 
@@ -34,6 +34,7 @@ export default function AuthSuccessPage() {
   const router = useRouter();
   const started = useRef(false);
   const [error, setError] = useState("");
+  const [noAccount, setNoAccount] = useState(false);
 
   useEffect(() => {
     if (started.current) return;
@@ -45,12 +46,21 @@ export default function AuthSuccessPage() {
         const { userId } = await completeOAuthSignIn();
 
         // 3 — prove the session to the server and get a Supabase session.
+        // The intent (sign in vs sign up, and which role) travelled here in
+        // the query string; the server is what enforces it.
+        const intent = readGoogleIntent();
         const jwt = await createAppwriteJwt();
-        const result = await bridgeGoogleSession({ userId, jwt });
+        const result = await bridgeGoogleSession({
+          userId,
+          jwt,
+          mode: intent.mode,
+          role: intent.role,
+        });
 
         if (!result.ok) {
           await signOutOfAppwrite();
           setError(result.error);
+          setNoAccount(!!result.noAccount);
           return;
         }
 
@@ -77,9 +87,23 @@ export default function AuthSuccessPage() {
           <div className="mt-3">
             <Alert tone="red">{error}</Alert>
           </div>
-          <Link href="/auth" className="nm-btn-primary mt-5 w-full py-3">
-            Back to sign in
-          </Link>
+          {noAccount ? (
+            // The Google address is real but has no NaijaMart account. The
+            // login page deliberately will not create one, so the way forward
+            // is the signup page — where the person also picks buyer/seller.
+            <div className="mt-5 space-y-2.5">
+              <Link href="/signup" className="nm-btn-primary w-full py-3">
+                Create an account
+              </Link>
+              <Link href="/signin" className="nm-btn-ghost w-full py-3">
+                Back to sign in
+              </Link>
+            </div>
+          ) : (
+            <Link href="/auth" className="nm-btn-primary mt-5 w-full py-3">
+              Back to sign in
+            </Link>
+          )}
         </div>
       </div>
     );

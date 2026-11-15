@@ -75,19 +75,7 @@ export function SignInForm() {
       <h1 className="text-[26px] font-extrabold tracking-tight text-ink-900">Welcome back</h1>
       <p className="mt-1.5 text-[13.5px] text-ink-500">Sign in to track orders, chats and payouts.</p>
 
-      {/* Google is offered first, as the quickest way in. The password form
-          below is unchanged, so every existing account still works exactly as
-          it did. Both paths end in the same Supabase session. */}
-      <div className="mt-5">
-        <GoogleSignInButton onError={setErr} />
-        <div className="mt-4 flex items-center gap-3">
-          <span className="h-px flex-1 bg-[var(--line)]" />
-          <span className="text-[12px] font-medium text-ink-400">or use your password</span>
-          <span className="h-px flex-1 bg-[var(--line)]" />
-        </div>
-      </div>
-
-      <form onSubmit={submit} className="mt-4 space-y-3.5" noValidate>
+      <form onSubmit={submit} className="mt-5 space-y-3.5" noValidate>
         <div>
           <label className="nm-label" htmlFor="email">Email address</label>
           <input
@@ -142,6 +130,27 @@ export function SignInForm() {
           {pending ? <><Spinner /> Signing in…</> : "Sign in"}
         </button>
       </form>
+
+      {/* ── Google sits BELOW the form ──────────────────────────────────────
+          It used to be the first thing on the page, above the email field.
+          The brief asks for it to move down, and that is also the better
+          order: the password form is what every existing account uses, so it
+          leads, and Google is the alternative underneath.
+
+          mode="signin" is the important part. This page must only sign in
+          accounts that already exist — a Google address that has never
+          signed up is refused by the server, so the login page cannot be
+          used to quietly create accounts. New people go through /signup. */}
+      <div className="mt-5">
+        <div className="flex items-center gap-3">
+          <span className="h-px flex-1 bg-[var(--line)]" />
+          <span className="text-[12px] font-medium text-ink-400">or</span>
+          <span className="h-px flex-1 bg-[var(--line)]" />
+        </div>
+        <div className="mt-4">
+          <GoogleSignInButton mode="signin" onError={setErr} />
+        </div>
+      </div>
 
       <p className="mt-5 text-center text-[13px] text-ink-500">
         New to NaijaMart?{" "}

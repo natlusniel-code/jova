@@ -85,10 +85,12 @@ export async function verifyAppwriteJwt(jwt: string): Promise<AppwriteUser | nul
  */
 export async function findOrCreateSupabaseUser(
   appwriteUser: AppwriteUser,
+  opts: { allowCreate?: boolean; role?: "buyer" | "seller" } = {},
 ): Promise<{ userId: string; email: string; created: boolean } | null> {
   const email = appwriteUser.email?.trim().toLowerCase();
   if (!email) return null;
 
+  const allowCreate = opts.allowCreate === true;
   const admin = createAdminClient();
 
   // ── Look for an existing account by email ────────────────────────────────
@@ -104,9 +106,21 @@ export async function findOrCreateSupabaseUser(
     const match = data.users.find(
       (u) => u.email?.trim().toLowerCase() === email,
     );
-    if (match) return { userId: match.id, email, created: false };
+    if (match) {
+      // An existing account signing in with Google keeps its own role. We do
+      // NOT overwrite it: someone who is already a seller must not be demoted
+      // to buyer just because they used the buyer signup page.
+      return { userId: match.id, email, created: false };
+    }
 
     if (data.users.length < perPage) break;
+  }
+
+  // ── No account, and this flow does not allow creating one ────────────────
+  // The login page passes allowCreate: false, so a Google address that has
+  // never signed up is refused here rather than silently becoming an account.
+  if (!allowCreate) {
+    throw new NoAccountError(email);
   }
 
   // ── Create the account ───────────────────────────────────────────────────
@@ -122,6 +136,7 @@ export async function findOrCreateSupabaseUser(
       // Recorded so the account is traceable back to the provider that made it.
       oauth_provider: "google",
       appwrite_user_id: appwriteUser.$id,
+      role: opts.role ?? "buyer",
     },
   });
 
@@ -138,5 +153,42 @@ export async function findOrCreateSupabaseUser(
     throw new Error(`Could not create your account: ${error.message}`);
   }
 
-  return { userId: data.user.id, email, created: true };
+  const userId = data.user.id;
+
+  // ── Write the profile row ────────────────────────────────────────────────
+  // The trigger creates it with role 'buyer'. A seller signup needs the role
+  // set now, because `postAuthDestination` reads `profiles.role` to decide
+  // where to send them — and a seller must go to onboarding, not the
+  // storefront. The name from Google is copied in too, so the profile is
+  // populated before the person ever sees a form.
+  try {
+    await admin
+      .from("profiles")
+      .update({
+        full_name: appwriteUser.name ?? email.split("@")[0],
+        role: opts.role ?? "buyer",
+      })
+      .eq("id", userId);
+  } catch {
+    // The trigger may not have committed yet. The account still works; the
+    // profile is filled in on the next step of the flow.
+  }
+
+  return { userId, email, created: true };
+}
+
+/**
+ * Thrown when a Google identity has no NaijaMart account and the flow does not
+ * allow creating one. A distinct class so the action can turn it into a
+ * friendly, specific message instead of a generic failure.
+ */
+export class NoAccountError extends Error {
+  readonly email: string;
+  constructor(email: string) {
+    super(
+      "There is no NaijaMart account for that Google address. Create an account first, then sign in with Google.",
+    );
+    this.name = "NoAccountError";
+    this.email = email;
+  }
 }

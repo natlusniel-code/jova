@@ -17,6 +17,7 @@ import {
   verifyCode,
 } from "@/lib/auth/local";
 import { postAuthDestination } from "@/lib/post-auth";
+import { sendVerificationEmail, isEmailVerified } from "@/lib/email/verify";
 
 /**
  * Every sign-in, sign-up and reset action for the site.
@@ -28,7 +29,7 @@ import { postAuthDestination } from "@/lib/post-auth";
 
 export type ActionResult =
   | { ok: true; next?: string; code?: string; email?: string }
-  | { ok: false; error: string; field?: string; code?: string; attemptsLeft?: number };
+  | { ok: false; error: string; field?: string; code?: string; attemptsLeft?: number; email?: string };
 
 /** Only same-origin relative paths — never an absolute URL. */
 function safeNext(value: string | null | undefined): string | null {
@@ -108,6 +109,23 @@ export async function signInAction(formData: FormData): Promise<ActionResult> {
       return { ok: false, error: friendly(verdict.error) };
     }
 
+    // ── The password is right — but is the address confirmed? ──────────────
+    // Checked AFTER the password, never before. Doing it first would let
+    // anyone discover which addresses have accounts by watching for the
+    // "not verified" message on a wrong password.
+    //
+    // Accounts created before this change were backfilled as verified in
+    // sql/0044, so this only ever catches a genuinely new, unconfirmed signup.
+    if (!(await isEmailVerified(resolvedEmail))) {
+      return {
+        ok: false,
+        error:
+          "Please confirm your email address first. We have sent you a link — open it, then sign in.",
+        field: "email",
+        email: resolvedEmail,
+      };
+    }
+
     await mintSession(resolvedEmail);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "We couldn't sign you in." };
@@ -154,83 +172,80 @@ export async function startSignupAction(formData: FormData): Promise<ActionResul
     const userId = await createAccountUser({ email, fullName, phone, state, city, role });
     await setPassword(userId, email, password);
 
-    // The code is generated here and returned to the form, which displays it.
-    // No email is sent — that is the whole point of this flow.
-    const code = await issueCode(email, "signup");
+    // ── Email the verification link ────────────────────────────────────────
+    // The old flow generated a code and returned it to the form, which showed
+    // it on screen. That proved nothing — whoever was at the keyboard could
+    // read it. The link goes to the address itself, so only someone with
+    // access to the inbox can confirm the account.
+    //
+    // If the mail cannot be sent we say so plainly. Letting the person sit on
+    // a "check your email" screen for a message that never left would be the
+    // worst outcome, so the account is still created (they can request a new
+    // link from sign-in) but the error is surfaced.
+    const sent = await sendVerificationEmail({
+      email,
+      firstName: fullName.split(" ")[0] ?? fullName,
+      role,
+    });
 
-    return { ok: true, code, email };
+    if (!sent.ok) {
+      return {
+        ok: false,
+        error: sent.error,
+        field: "email",
+        email,
+      };
+    }
+
+    return { ok: true, email };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "We couldn't create your account." };
   }
 }
 
 // ───────────────────────────────────────────────────────────────────────
-// sign up — step 2: the user retypes the code
+// sign up — step 2: the person opens the link in their email
 // ───────────────────────────────────────────────────────────────────────
-export async function verifySignupAction(formData: FormData): Promise<ActionResult> {
+/**
+ * Send a fresh verification link.
+ *
+ * The old `verifySignupAction` / `resendSignupCodeAction` pair is gone: there
+ * is no code to retype any more, so there is nothing for the browser to check.
+ * Confirmation happens on `/auth/verify` when the link is opened, and this
+ * action only re-sends it.
+ *
+ * It deliberately does not reveal whether the address has an account — the
+ * reply is the same either way, so the form cannot be used to enumerate users.
+ */
+export async function resendVerificationAction(
+  formData: FormData,
+): Promise<ActionResult> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const code = String(formData.get("code") ?? "").trim();
   const role = String(formData.get("role") ?? "buyer") === "seller" ? "seller" : "buyer";
 
-  if (!/^\d{6}$/.test(code)) {
-    return { ok: false, error: "Enter the 6-digit code shown above.", field: "code" };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) {
+    return { ok: false, error: "Enter a valid email address.", field: "email" };
   }
 
   try {
-    const verdict = await verifyCode(email, code, "signup");
-
-    if (!verdict.ok) {
-      if (verdict.error === "mismatch") {
-        return {
-          ok: false,
-          error: `That code doesn't match. Here's a new one — type it in.`,
-          code: verdict.rotatedCode,
-          attemptsLeft: verdict.attemptsLeft,
-        };
-      }
-      if (verdict.error === "expired") {
-        return { ok: false, error: "That code expired. Request a new one below." };
-      }
-      if (verdict.error === "too_many") {
-        return { ok: false, error: "Too many wrong tries. Request a new code below." };
-      }
-      return { ok: false, error: "That code is no longer valid. Request a new one below." };
+    // Already confirmed? Nothing to resend — send them to sign in instead.
+    if (await isEmailVerified(email)) {
+      return { ok: true, next: "/signin" };
     }
 
-    // The account is confirmed. Sign them in and route by role.
-    const admin = createAdminClient();
-    const { data: prof } = await admin
-      .from("profiles")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
+    const sent = await sendVerificationEmail({
+      email,
+      firstName: email.split("@")[0],
+      role,
+    });
+    if (!sent.ok) return { ok: false, error: sent.error };
 
-    await mintSession(email);
-
-    let destination = role === "seller" ? "/seller/onboarding?step=1" : "/";
-    if (prof?.id) {
-      try {
-        const supabase = requestClient();
-        destination = await postAuthDestination(supabase, prof.id, null, role);
-      } catch {
-        /* keep the role-based default */
-      }
-    }
-
-    return { ok: true, next: destination };
+    return { ok: true, email };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "We couldn't verify that code." };
-  }
-}
-
-/** Issue a fresh signup code (the "request a new code" button). */
-export async function resendSignupCodeAction(formData: FormData): Promise<ActionResult> {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  try {
-    const code = await issueCode(email, "signup");
-    return { ok: true, code, email };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "We couldn't create a new code." };
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "We couldn't send a new link.",
+    };
   }
 }
 
@@ -332,6 +347,73 @@ export async function finishResetAction(formData: FormData): Promise<ActionResul
 // ───────────────────────────────────────────────────────────────────────
 // sign out
 // ───────────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────────────
+// Google signup — the buyer's last step
+// ───────────────────────────────────────────────────────────────────────
+/**
+ * Save the phone number and local government a Google buyer still needs.
+ *
+ * Google gives us a name and a verified email and nothing else. This writes
+ * the two fields the marketplace actually depends on: the phone (the
+ * password-reset factor) and the state/LGA (which decides which sellers the
+ * buyer can order from).
+ *
+ * It writes to `profiles` through the request client, so RLS applies and the
+ * row can only be the caller's own — the id is never taken from the form.
+ */
+export async function completeGoogleProfileAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  const fullName = String(formData.get("full_name") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").replace(/\s/g, "");
+  const state = String(formData.get("state") ?? "").trim();
+  const city = String(formData.get("city") ?? "").trim();
+
+  if (fullName.length < 3) {
+    return { ok: false, error: "Enter your full name.", field: "full_name" };
+  }
+  if (!/^0\d{10}$/.test(phone)) {
+    return { ok: false, error: "Use 11 digits, like 08012345678.", field: "phone" };
+  }
+  if (!city) {
+    return { ok: false, error: "Choose your local government.", field: "city" };
+  }
+
+  try {
+    const supabase = requestClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return { ok: false, error: "Your session expired. Please sign in again." };
+    }
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ full_name: fullName, phone, state, city })
+      .eq("id", user.id);
+    if (error) return { ok: false, error: error.message };
+
+    // A buyer goes to the storefront. A seller who somehow reached this page
+    // still has onboarding to finish, so they are sent there instead.
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    return {
+      ok: true,
+      next: prof?.role === "seller" ? "/seller/onboarding?step=1" : "/",
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "We couldn't save your details.",
+    };
+  }
+}
+
 export async function signOutAction(): Promise<void> {
   const supabase = requestClient();
   await supabase.auth.signOut();

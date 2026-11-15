@@ -104,17 +104,45 @@ export function pingAppwrite(): Promise<AppwritePingResult> {
 }
 
 /**
+ * What the server should do when the Google identity comes back.
+ *
+ *   "signin" — the account must already exist. A Google address that has never
+ *              signed up is refused, so the login page cannot be used to
+ *              silently create accounts.
+ *   "signup" — create the account if it does not exist, with `role` deciding
+ *              where the person lands next.
+ */
+export type GoogleAuthMode = "signin" | "signup";
+
+/**
  * Start the Google sign-in.
  *
  * `createOAuth2Token` NAVIGATES the browser to Google — it does not return a
  * promise that resolves with a token. So there is nothing to `await` and no
  * manual redirect afterwards; the `await` below is only there to surface a
  * synchronous throw (a misconfigured provider) as a rejected promise.
+ *
+ * ── Why mode and role ride in the success URL ─────────────────────────────
+ * The browser leaves the app entirely and comes back with only what Appwrite
+ * puts in the query string. There is no session, no React state and no
+ * localStorage we can trust across the round trip, so the intent has to travel
+ * in the URL. It is read back on `/auth/success` and handed to the server
+ * action, which is where it is actually enforced — a tampered value can only
+ * ask for a different landing page, never grant access to an account that does
+ * not exist.
  */
-export async function signInWithGoogle(): Promise<void> {
+export async function signInWithGoogle(
+  opts: { mode?: GoogleAuthMode; role?: "buyer" | "seller" } = {},
+): Promise<void> {
   const { account } = appwrite();
 
-  const success = `${window.location.origin}/auth/success`;
+  const mode: GoogleAuthMode = opts.mode === "signup" ? "signup" : "signin";
+  const role = opts.role === "seller" ? "seller" : "buyer";
+
+  const params = new URLSearchParams({ mode });
+  if (mode === "signup") params.set("role", role);
+
+  const success = `${window.location.origin}/auth/success?${params.toString()}`;
   const failure = `${window.location.origin}/auth/failure`;
 
   await account.createOAuth2Token({
@@ -122,6 +150,15 @@ export async function signInWithGoogle(): Promise<void> {
     success,
     failure,
   });
+}
+
+/** Read the intent back off the success URL. Defaults to a plain sign-in. */
+export function readGoogleIntent(): { mode: GoogleAuthMode; role: "buyer" | "seller" } {
+  const url = new URL(window.location.href);
+  const mode: GoogleAuthMode =
+    url.searchParams.get("mode") === "signup" ? "signup" : "signin";
+  const role = url.searchParams.get("role") === "seller" ? "seller" : "buyer";
+  return { mode, role };
 }
 
 /**

@@ -24,7 +24,8 @@ import { Spinner, Alert, PersonIcon } from "@/components/ui";
  *
  * ── Why the upload happens here and not on submit ─────────────────────────
  * The account already exists and the buyer is already signed in by the time
- * this screen renders (verifySignupAction mints the session). So the photo is
+ * this screen renders (the email link has been opened and the person has
+ * signed in). So the photo is
  * written to `profiles.avatar_url` the moment it is chosen, and "Continue"
  * only navigates. A buyer who uploads and then closes the tab still keeps the
  * photo, and there is no half-saved state to recover from.
