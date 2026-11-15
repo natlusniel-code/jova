@@ -1,7 +1,11 @@
 "use client";
 
 import { Client, Account, OAuthProvider } from "appwrite";
-import { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "./config";
+import {
+  APPWRITE_ENDPOINT,
+  APPWRITE_PROJECT_ID,
+  APPWRITE_PROJECT_NAME,
+} from "./config";
 
 /**
  * Appwrite Web SDK — browser only.
@@ -27,7 +31,7 @@ import { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "./config";
  * the Appwrite Console and is never part of this bundle.
  */
 
-export { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID };
+export { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, APPWRITE_PROJECT_NAME };
 
 let cached: { client: Client; account: Account } | null = null;
 
@@ -41,6 +45,62 @@ export function appwrite() {
 
   cached = { client, account: new Account(client) };
   return cached;
+}
+
+/**
+ * The result of the one-time startup connectivity check.
+ *
+ * `ok: false` is NOT fatal — the marketplace runs on Supabase and works fine
+ * without Appwrite. It only means Google sign-in is unavailable, and the UI
+ * says so instead of letting the button fail silently.
+ */
+export type AppwritePingResult =
+  | { ok: true; endpoint: string; projectId: string; projectName: string }
+  | { ok: false; endpoint: string; projectId: string; error: string };
+
+let pingPromise: Promise<AppwritePingResult> | null = null;
+
+/**
+ * Confirm the Appwrite SDK is configured and the endpoint is reachable.
+ *
+ * ── Why this is memoised ────────────────────────────────────────────────────
+ * `client.ping()` is a real network round-trip. The brief asks for it to run
+ * once when the app starts, so the promise is cached: every caller after the
+ * first shares the same result instead of re-pinging on each mount. A failed
+ * ping is cached too — retrying on every render would hammer a down endpoint.
+ *
+ * ── Why it never throws ─────────────────────────────────────────────────────
+ * A thrown error here would take down the auth screen for a problem that only
+ * affects one optional sign-in method. It resolves to a result object instead,
+ * so the caller decides what to show.
+ */
+export function pingAppwrite(): Promise<AppwritePingResult> {
+  if (pingPromise) return pingPromise;
+
+  pingPromise = (async (): Promise<AppwritePingResult> => {
+    const base = {
+      endpoint: APPWRITE_ENDPOINT,
+      projectId: APPWRITE_PROJECT_ID,
+    };
+
+    try {
+      const { client } = appwrite();
+      // `ping()` hits GET /ping and resolves with the server's "Pong!".
+      await client.ping();
+      return { ok: true, ...base, projectName: APPWRITE_PROJECT_NAME };
+    } catch (e) {
+      return {
+        ok: false,
+        ...base,
+        error:
+          e instanceof Error
+            ? e.message
+            : "Could not reach the Appwrite endpoint.",
+      };
+    }
+  })();
+
+  return pingPromise;
 }
 
 /**
