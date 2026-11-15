@@ -128,7 +128,8 @@ export async function signInAction(formData: FormData): Promise<ActionResult> {
 
     await mintSession(resolvedEmail);
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "We couldn't sign you in." };
+    console.error("[auth] sign-in failed", e);
+    return { ok: false, error: "We couldn't sign you in. Please try again." };
   }
 
   // Where to land is decided from the database, not from the form: a seller
@@ -199,7 +200,11 @@ export async function startSignupAction(formData: FormData): Promise<ActionResul
 
     return { ok: true, email };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "We couldn't create your account." };
+    console.error("[auth] signup failed", e);
+    return {
+      ok: false,
+      error: "We couldn't create your account just now. Please try again.",
+    };
   }
 }
 
@@ -242,9 +247,10 @@ export async function resendVerificationAction(
 
     return { ok: true, email };
   } catch (e) {
+    console.error("[auth] resend verification failed", e);
     return {
       ok: false,
-      error: e instanceof Error ? e.message : "We couldn't send a new link.",
+      error: "We couldn't send a new link just now. Please try again in a moment.",
     };
   }
 }
@@ -296,7 +302,8 @@ export async function startResetAction(formData: FormData): Promise<ActionResult
     const code = await issueCode(email, "reset");
     return { ok: true, code, email };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "We couldn't start a reset." };
+    console.error("[auth] reset start failed", e);
+    return { ok: false, error: "We couldn't start a reset just now. Please try again." };
   }
 }
 
@@ -340,7 +347,11 @@ export async function finishResetAction(formData: FormData): Promise<ActionResul
 
     return { ok: true, next: "/" };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "We couldn't reset your password." };
+    console.error("[auth] password reset failed", e);
+    return {
+      ok: false,
+      error: "We couldn't reset your password just now. Please try again.",
+    };
   }
 }
 
@@ -392,7 +403,13 @@ export async function completeGoogleProfileAction(
       .from("profiles")
       .update({ full_name: fullName, phone, state, city })
       .eq("id", user.id);
-    if (error) return { ok: false, error: error.message };
+    if (error) {
+      console.error("[auth] could not save Google profile details", error);
+      return {
+        ok: false,
+        error: "We couldn't save your details just now. Please try again.",
+      };
+    }
 
     // A buyer goes to the storefront. A seller who somehow reached this page
     // still has onboarding to finish, so they are sent there instead.
@@ -407,9 +424,10 @@ export async function completeGoogleProfileAction(
       next: prof?.role === "seller" ? "/seller/onboarding?step=1" : "/",
     };
   } catch (e) {
+    console.error("[auth] save Google profile details failed", e);
     return {
       ok: false,
-      error: e instanceof Error ? e.message : "We couldn't save your details.",
+      error: "We couldn't save your details just now. Please try again.",
     };
   }
 }

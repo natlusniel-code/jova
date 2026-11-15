@@ -20,6 +20,15 @@ const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const FROM =
   process.env.EMAIL_FROM ?? "NaijaMart <hello@naijamart.ng>";
 
+/**
+ * The one message a person ever sees when mail could not be sent.
+ *
+ * Deliberately free of status codes, provider names, error types and JSON.
+ * Whatever actually went wrong is logged server-side by the caller above.
+ */
+const SEND_FAILED_MESSAGE =
+  "We could not send your verification email just now. Please try again in a moment.";
+
 export type SendResult = { ok: true } | { ok: false; error: string };
 
 export async function sendEmail(input: {
@@ -62,20 +71,19 @@ export async function sendEmail(input: {
     });
 
     if (!res.ok) {
+      // The provider's response is a JSON error body with a status code and an
+      // internal reason. That is useful in the server log and meaningless (and
+      // alarming) on screen, so it is logged here and the caller gets one plain
+      // sentence. Never return `body` to the UI: it is code-like text.
       const body = await res.text().catch(() => "");
-      return {
-        ok: false,
-        error: `We could not send the email (${res.status}). ${body.slice(0, 200)}`,
-      };
+      console.error(
+        `[email] Resend rejected the message: ${res.status} ${body.slice(0, 500)}`,
+      );
+      return { ok: false, error: SEND_FAILED_MESSAGE };
     }
     return { ok: true };
   } catch (e) {
-    return {
-      ok: false,
-      error:
-        e instanceof Error
-          ? `We could not send the email: ${e.message}`
-          : "We could not send the email.",
-    };
+    console.error("[email] send failed", e);
+    return { ok: false, error: SEND_FAILED_MESSAGE };
   }
 }

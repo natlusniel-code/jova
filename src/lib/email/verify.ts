@@ -49,7 +49,15 @@ export async function sendVerificationEmail(input: {
     p_email: input.email,
   });
   if (error) {
-    return { ok: false, error: `We could not prepare your verification link: ${error.message}` };
+    // The RPC error is a Postgres message (`function … does not exist`,
+    // `duplicate key value violates …`). It belongs in the log, not on the
+    // signup screen, so it is never interpolated into the returned message.
+    console.error("[email] could not issue a verification token", error);
+    return {
+      ok: false,
+      error:
+        "We could not prepare your verification link just now. Please try again in a moment.",
+    };
   }
 
   const verifyUrl = `${siteUrl()}/auth/verify?token=${encodeURIComponent(String(token))}`;

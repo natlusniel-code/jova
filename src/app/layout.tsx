@@ -4,7 +4,6 @@ import { INSTALL_CAPTURE_SCRIPT } from "@/lib/install-capture";
 import { GlobalLoader } from "@/components/global-loader";
 import { GlobalLoaderTriggers } from "@/components/global-loader-triggers";
 import { NotificationBridge } from "@/components/notification-bridge";
-import { AppwriteStatus } from "@/components/appwrite-status";
 import "./globals.css";
 // Responsive guards, imported separately so globals.css stays as it was.
 import "./responsive-guards.css";
@@ -75,10 +74,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             notification for a new row while the tab is open. In the ROOT
             layout so buyers, sellers and admins all get it. */}
         <NotificationBridge />
-        {/* Runs `client.ping()` once at app start so the Appwrite setup can be
-            confirmed. Renders nothing when healthy after a few seconds, and a
-            dismissible notice when the endpoint is unreachable. */}
-        <AppwriteStatus />
         {children}
       </body>
     </html>

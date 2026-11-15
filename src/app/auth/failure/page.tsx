@@ -12,16 +12,29 @@ export const metadata = { title: "Sign-in failed" };
  * Component: there is nothing to await and nothing to store, so it renders
  * immediately with a way back.
  *
- * The `reason` query parameter is echoed only as a short, sanitised hint — never
- * rendered as raw HTML — so a crafted link cannot inject anything into the page.
+ * ── Why the raw provider error is never printed ──
+ * Appwrite sends something like
+ *   {"message":"The Google OAuth2 provider returned an error: access_denied",
+ *    "type":"user_oauth2_provider_error","code":424}
+ * That is a JSON blob with an internal error type and a numeric code. It means
+ * nothing to the person reading it and it makes the site look broken, so it is
+ * reduced to one plain sentence here and the raw value is discarded. Only the
+ * three cases that actually matter to a visitor are distinguished: they
+ * cancelled on Google's screen, the provider could not be reached, or
+ * something else went wrong.
  */
 export default function AuthFailurePage({
   searchParams,
 }: {
   searchParams?: { reason?: string; error?: string };
 }) {
-  const raw = (searchParams?.reason ?? searchParams?.error ?? "").trim();
-  const hint = raw.slice(0, 120);
+  const raw = `${searchParams?.reason ?? ""} ${searchParams?.error ?? ""}`;
+
+  // `access_denied` is Google's code for "the person pressed Cancel or closed
+  // the consent screen". It is by far the most common outcome here, and it is
+  // not an error at all — so it gets its own wording rather than a warning.
+  const cancelled = /access_denied|cancel|denied/i.test(raw);
+  const unreachable = /network|fetch|timeout|unreachable|econn/i.test(raw);
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col justify-center px-4">
@@ -40,9 +53,11 @@ export default function AuthFailurePage({
 
         <div className="mt-4">
           <Alert tone="amber" title="What happened">
-            {hint
-              ? `Google reported: ${hint}`
-              : "The sign-in was cancelled or the provider could not be reached."}
+            {cancelled
+              ? "You closed or cancelled the Google sign-in window before it finished."
+              : unreachable
+                ? "We could not reach Google just now. Check your connection and try again."
+                : "Google could not complete the sign-in. Please try again."}
           </Alert>
         </div>
 
