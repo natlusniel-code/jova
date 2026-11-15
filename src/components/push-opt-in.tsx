@@ -9,6 +9,7 @@ import {
   subscribeToPush,
 } from "@/lib/browser-notify";
 import { createClient } from "@/lib/supabase/client";
+import { VAPID_PUBLIC_KEY } from "@/lib/push-public";
 import { Alert, Spinner } from "@/components/ui";
 
 type State = "unsupported" | "default" | "granted" | "denied";
@@ -51,10 +52,10 @@ export function PushOptIn() {
     }
     setNote("Notifications are on for this browser.");
 
-    // Store a push subscription if the deployment has a VAPID key. Without
-    // one this is a no-op that explains itself rather than failing silently.
-    const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    const sub = await subscribeToPush(vapid);
+    // Store a push subscription. The VAPID public key is the site's original
+    // one, restored in code (src/lib/push-public.ts) — the same key existing
+    // subscribers are bound to, so this re-registers them against it.
+    const sub = await subscribeToPush(VAPID_PUBLIC_KEY);
     if (sub.ok && sub.subscription) {
       const supabase = createClient();
       const { data: auth } = await supabase.auth.getUser();

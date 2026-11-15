@@ -15,12 +15,12 @@ import { notificationTitle, notificationBody, sourceFor } from "./notification-s
  * that user's devices — one path, so any feature that writes a row is pushed
  * automatically, for buyers, sellers and admins alike.
  *
- * The VAPID key pair comes from the environment only (`VAPID_PRIVATE_KEY` +
- * `NEXT_PUBLIC_VAPID_PUBLIC_KEY`). There is no committed fallback any more; a
- * server without them reports itself as unconfigured instead of signing with a
- * leaked key. */
+ * The VAPID key pair is the site's original pair, restored in code in
+ * `push-private.ts` / `push-public.ts` after the move to environment variables
+ * broke delivery. It is the same pair existing subscribers are bound to, so
+ * they receive notifications again without re-subscribing. */
 
-/** The VAPID triple, or null when this server has no key pair. */
+/** The VAPID triple. Always present — the pair lives in code. */
 function vapid(): WebPushConfig | null {
   return webPushConfigOrNull();
 }

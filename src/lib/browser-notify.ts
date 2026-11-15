@@ -144,7 +144,7 @@ export async function subscribeToPush(vapidPublicKey?: string): Promise<{
     return {
       ok: false,
       error:
-        "Background push is not configured yet — it needs a VAPID public key (NEXT_PUBLIC_VAPID_PUBLIC_KEY). In-browser notifications still work.",
+        "Background push is not configured — no VAPID public key was supplied. In-browser notifications still work.",
     };
   }
   const reg = (await navigator.serviceWorker.getRegistration(SW_PATH)) ?? (await registerServiceWorker());
