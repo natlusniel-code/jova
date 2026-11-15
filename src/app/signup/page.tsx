@@ -1,36 +1,50 @@
-import { redirect } from "next/navigation";
+import Link from "next/link";
+import { AuthSplit } from "@/components/auth-split";
+import { SignupPanel } from "@/components/signup/signup-panel";
 
 export const metadata = { title: "Create your account" };
 
 /**
- * `/signup` — a permanent redirect to `/auth`.
+ * `/signup` — the SIGN-UP page, separate from login.
  *
- * ── Why this is a redirect and not a page ───────────────────────────────────
- * The multi-step email signup (role → details → verify code → photo) is gone.
- * With Google as the only provider, signing up and signing in are the same
- * act, so there is one screen for both.
+ * ── Why it is no longer a redirect ───────────────────────────────
+ * This used to 302 to `/auth`, because there was one combined auth screen.
+ * The brief asks for a real split: login and sign-up are two pages with two
+ * different jobs, and they now differ in behaviour as well as copy.
  *
- * The role choice that used to be step 1 now lives on `/auth` as a two-card
- * toggle above the Google button, so a seller still picks "I'm here to sell"
- * before continuing — it just no longer needs its own page.
+ * ── What is kept ────────────────────────────────────────────────
+ * The page keeps the same `AuthSplit` shell and the same role-choice visual as
+ * the previous sign-up design — two cards, same copy, same styling. The role
+ * is preselected when `?role=seller` is passed (the seller-onboarding "create
+ * a seller account" link), so those links still land correctly.
  *
- * `?role=seller` is preserved for the links that pass it (the seller
- * onboarding "create a seller account" button), so those still land on the
- * right default.
+ * `?existing=1` is set by the OAuth callback when the Google address already
+ * has an account; the panel turns it into "you already have an account — log
+ * in instead". `?next=` is a same-origin path only, so it can never become an
+ * open redirect.
  */
 export default function SignupPage({
   searchParams,
 }: {
-  searchParams?: { role?: string; next?: string };
+  searchParams?: { role?: string; next?: string; existing?: string };
 }) {
-  const role = searchParams?.role === "seller" ? "seller" : "";
+  const initialRole =
+    searchParams?.role === "seller"
+      ? ("seller" as const)
+      : searchParams?.role === "buyer"
+        ? ("buyer" as const)
+        : null;
+
   const raw = searchParams?.next ?? "";
-  const next = raw.startsWith("/") && !raw.startsWith("//") ? raw : "";
+  const next = raw.startsWith("/") && !raw.startsWith("//") ? raw : undefined;
 
-  const params = new URLSearchParams();
-  if (role) params.set("role", role);
-  if (next) params.set("next", next);
-
-  const qs = params.toString();
-  redirect(qs ? `/auth?${qs}` : "/auth");
+  return (
+    <AuthSplit>
+      <SignupPanel
+        initialRole={initialRole}
+        next={next}
+        existing={searchParams?.existing === "1"}
+      />
+    </AuthSplit>
+  );
 }

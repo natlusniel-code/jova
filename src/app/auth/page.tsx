@@ -1,34 +1,35 @@
-import { redirect } from "next/navigation";
 import { AuthSplit } from "@/components/auth-split";
+import { SignInVideo } from "@/components/signin-video";
+import { LoginGlassPanel } from "@/components/login-glass-panel";
 import { getSession } from "@/lib/supabase/server";
-import { GoogleAuthPanel } from "@/components/google-auth-panel";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Sign in" };
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Log in" };
 
 /**
- * `/auth` — the single entry point into NaijaMart.
+ * `/auth` — the LOGIN page.
  *
- * ── The guard ───────────────────────────────────────────────────────────────
- * `getSession()` runs on the server BEFORE anything renders. If the visitor
- * already has a Supabase session we redirect to /dashboard, so a signed-in user
- * never sees a sign-in screen. Doing this server-side (rather than in a
- * `useEffect`) means there is no flash of the auth UI before the redirect.
+ * ── Layout ──────────────────────────────────────────────────────
+ * Video first, unchanged: same component, same file, same poster, same silent
+ * autoplay behaviour. Directly underneath it sits the Google action, inside a
+ * translucent glass card that overlaps the video's bottom edge so the screen
+ * reads as one object. Below that, the "Create an account" link — login and
+ * sign-up are now two separate pages, and this is the door between them.
  *
- * ── Why this is now the only auth page ──────────────────────────────────────
- * Email sign-up, email sign-in, the verification code and the password reset
- * have all been removed. Google is the only identity provider, so there is one
- * screen, one action, and no reason to split "sign in" from "sign up" — the
- * server creates the account if it is new and reuses it if it is not.
- *
- * `/signin` and `/signup` still exist as thin redirects to this page, because
- * they are linked from dozens of places (every `redirect("/signin?next=…")`
- * guard, old emails, bookmarks). Redirecting keeps those links working without
- * leaving a second, half-dead auth surface in the app.
+ * ── Why the guard ───────────────────────────────────────────────
+ * `getSession()` runs on the server before anything renders, so a signed-in
+ * visitor never sees a login screen and there is no flash of auth UI before
+ * the redirect.
  */
 export default async function AuthPage({
   searchParams,
 }: {
-  searchParams?: { next?: string; role?: string };
+  searchParams?: {
+    next?: string;
+    noaccount?: string;
+    existing?: string;
+  };
 }) {
   const session = await getSession();
   if (session) redirect("/dashboard");
@@ -37,12 +38,19 @@ export default async function AuthPage({
   const raw = searchParams?.next ?? "";
   const next = raw.startsWith("/") && !raw.startsWith("//") ? raw : undefined;
 
-  // A seller link (`/signup?role=seller`) preselects the seller card.
-  const initialRole = searchParams?.role === "seller" ? "seller" : "buyer";
+  const noAccount = searchParams?.noaccount === "1";
+
+  // Someone who already has an account landed on login — that is the happy
+  // path here, so nothing to report. `existing` only means something on
+  // /signup, and /auth never renders it.
+  const errorMessage = "";
 
   return (
     <AuthSplit>
-      <GoogleAuthPanel next={next} initialRole={initialRole} />
+      <div className="mb-4">
+        <SignInVideo />
+      </div>
+      <LoginGlassPanel next={next} noAccount={noAccount} errorMessage={errorMessage} />
     </AuthSplit>
   );
 }

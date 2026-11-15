@@ -10,7 +10,7 @@ import { Spinner, Alert } from "@/components/ui";
 /**
  * `/auth/success` — the OAuth success callback.
  *
- * ── What happens here ───────────────────────────────────────────────────────
+ * ── What happens here ──────────────────────────────────────────────
  *  1. Read `userId` + `secret` from the query string.
  *  2. `await account.createSession(...)` — this is the step that turns the
  *     one-time token into a real Appwrite session. It MUST be awaited before
@@ -19,13 +19,20 @@ import { Spinner, Alert } from "@/components/ui";
  *     which verifies it and mints the matching Supabase session cookie.
  *  4. Navigate to the destination the server chose.
  *
- * ── Why the ref guard ───────────────────────────────────────────────────────
+ * ── Why the two refusals navigate instead of rendering here ─────────
+ * "You do not have an account yet" and "that account already exists" belong on
+ * the page the person was actually using — the message has to sit under the
+ * button they pressed, next to the link that resolves it. So both are sent
+ * back to their origin page as a query flag (`?noaccount=1`, `?existing=1`)
+ * rather than drawn on this spinner screen, which has no context.
+ *
+ * ── Why the ref guard ──────────────────────────────────────────────
  * React 18 StrictMode mounts effects twice in development. The `secret` is
  * single-use, so a second `createSession` call would fail with a confusing
  * error after the first one already succeeded. The ref makes the exchange
  * happen exactly once per page load.
  *
- * ── Why the Appwrite session is deleted on failure ──────────────────────────
+ * ── Why the Appwrite session is deleted on failure ──────────────────
  * If the bridge fails, the user is signed in to Appwrite but not to the
  * marketplace — a half-signed-in state where every page bounces them back
  * here. Clearing the Appwrite session makes the retry clean.
@@ -59,6 +66,19 @@ export default function AuthSuccessPage() {
 
         if (!result.ok) {
           await signOutOfAppwrite();
+
+          // Send the refusal back to the page that caused it, so the message
+          // and the link that fixes it appear together.
+          const back = new URLSearchParams();
+          if (result.noAccount) back.set("noaccount", "1");
+          else if (result.existing) back.set("existing", "1");
+
+          if (back.toString()) {
+            const base = intent.mode === "signup" ? "/signup" : "/auth";
+            router.replace(`${base}?${back.toString()}`);
+            return;
+          }
+
           setError(result.error);
           return;
         }

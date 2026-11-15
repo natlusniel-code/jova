@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 export const metadata = { title: "Sign in" };
 
 /**
- * `/signin` — a permanent redirect to `/auth`.
+ * `/signin` is a permanent redirect to the new LOGIN page, `/auth`.
  *
  * ── Why this is a redirect and not a page ───────────────────────────────────
  * The email + password form that used to live here is gone: Google is the only

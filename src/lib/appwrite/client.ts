@@ -2,9 +2,11 @@
 
 import { Client, Account, OAuthProvider } from "appwrite";
 import {
+  APP_URL,
   APPWRITE_ENDPOINT,
   APPWRITE_PROJECT_ID,
   APPWRITE_PROJECT_NAME,
+  oauthOrigin,
 } from "./config";
 
 /**
@@ -149,8 +151,16 @@ export async function signInWithGoogle(
     params.set("next", opts.next);
   }
 
-  const success = `${window.location.origin}/auth/success?${params.toString()}`;
-  const failure = `${window.location.origin}/auth/failure`;
+  // ── The redirect MUST be a registered Appwrite Web platform ───────────
+  // This used to be `window.location.origin`, which made the OAuth start fail
+  // with `Error 400 Invalid success param: Invalid URI` on every host that is
+  // not registered on the project — which is every preview alias, and the
+  // `njamart-...` (no "ai") address the bug was reported from. `oauthOrigin`
+  // pins it to the canonical origin and keeps localhost for development.
+  const origin = oauthOrigin(window.location.origin);
+
+  const success = `${origin}/auth/success?${params.toString()}`;
+  const failure = `${origin}/auth/failure`;
 
   await account.createOAuth2Token({
     provider: OAuthProvider.Google,

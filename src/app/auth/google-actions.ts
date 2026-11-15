@@ -31,7 +31,7 @@ import {
 
 export type GoogleBridgeResult =
   | { ok: true; next: string }
-  | { ok: false; error: string; noAccount?: boolean };
+  | { ok: false; error: string; noAccount?: boolean; existing?: boolean };
 
 export async function bridgeGoogleSession(input: {
   userId: string;
@@ -70,20 +70,24 @@ export async function bridgeGoogleSession(input: {
   }
 
   // ── 2. Find or create the Supabase account ───────────────────────────────
-  // With email sign-up removed, Google is the ONLY way to create an account,
-  // so creation is always allowed. There is no longer a "the login page must
-  // not create accounts" rule to enforce, because there is no separate login
-  // page: `/auth` is both doors at once.
+  // `mode` is the whole difference between the two pages, and it is enforced
+  // HERE, on the server, not in the browser:
   //
-  // The important half is the LOOKUP, not the create. `findOrCreateSupabaseUser`
-  // matches on email, so someone who signed up with a password before Google
-  // was added — and whose address is the same as their Google account — is
-  // handed back their EXISTING Supabase user id. Same profile, same role, same
-  // orders and chats. No duplicate account is created.
+  //   signin — the account must already exist. A Google address we have never
+  //            seen is refused with `noAccount`, so the login page cannot be
+  //            used to quietly create accounts. The person is sent to the
+  //            buyer/seller choice instead.
+  //   signup — the account is created if it is missing, with the role picked on
+  //            the sign-up page.
+  //
+  // The LOOKUP is what matters in both cases. `findOrCreateSupabaseUser`
+  // matches on email, so someone who already has an account is handed back
+  // their EXISTING Supabase user id — same profile, same role, same orders and
+  // chats. No duplicate buyer is created.
   let resolved: { userId: string; email: string; created: boolean } | null;
   try {
     resolved = await findOrCreateSupabaseUser(appwriteUser, {
-      allowCreate: true,
+      allowCreate: mode === "signup",
       role,
     });
   } catch (e) {
@@ -133,6 +137,15 @@ export async function bridgeGoogleSession(input: {
     // Buyer: collect the local government and phone number before anything
     // else. `next` carries them to the storefront afterwards.
     return { ok: true, next: "/signup/complete" };
+  }
+
+  // ── Already has an account, but came through the SIGN-UP page ─────────
+  // They pressed "create an account" for an email that is already registered.
+  // Do not silently sign them in from the sign-up door and do not send them to
+  // a dashboard: say the account already exists and point them at login, which
+  // is the page that shows their real profile, orders and chats.
+  if (mode === "signup") {
+    return { ok: false, error: "existing", existing: true };
   }
 
   // An existing account follows the same role rules the marketplace already
