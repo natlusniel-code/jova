@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { SessionProfile } from "@/lib/supabase/server";
 import { SUPPORT_WHATSAPP } from "@/lib/support";
+import { seededShuffle } from "@/lib/stable-random";
 
 export type Listing = {
   id: string;
@@ -195,8 +196,37 @@ export async function getPopularServices(city: string | null, limit = 6) {
   return (data ?? []) as unknown as Listing[];
 }
 
-/** Verified sellers near a city, newest sellers boosted first (simple ranking). */
-export async function getNearbyShops(city: string | null, limit = 6) {
+/**
+ * How many verified shops to pull before picking the ones to show.
+ *
+ * The storefront shows three, but three cannot be *chosen* from three — that
+ * is just a fixed list. We fetch a wider pool and let the seeded shuffle pick
+ * from it, so different accounts genuinely get different shops. 60 is a
+ * deliberate ceiling: it is far more than any one city has today, so in
+ * practice the pool is "all verified shops in scope", and it stops a
+ * pathological catalogue from pulling thousands of rows to render three cards.
+ */
+const SHOP_POOL = 60;
+
+/**
+ * Verified sellers near a city.
+ *
+ * ── Why the ordering is seeded, not `random()` ─────────────────────────────
+ * The storefront shows three verified sellers and the pick must be **random
+ * per account but stable for that account**. `ORDER BY random()` (or a
+ * `Math.random()` pick) is random per *request*: the home page is a Server
+ * Component, so every navigation and every refresh would reshuffle the row.
+ * A buyer who taps a shop and comes back would find a different three.
+ *
+ * So the pool is ordered by rating (a sane, deterministic base) and then
+ * shuffled with a PRNG seeded from the caller's account id. Same account →
+ * same three shops, every time. Different account → different three. No
+ * column, no migration, no stored state.
+ *
+ * `seed` is optional so existing callers keep working; without it the result
+ * is the plain rating-ordered list, which is the old behaviour.
+ */
+export async function getNearbyShops(city: string | null, limit = 6, seed?: string) {
   const supabase = createClient();
   let q = supabase
     .from("shops")
@@ -204,12 +234,15 @@ export async function getNearbyShops(city: string | null, limit = 6) {
     .eq("status", "approved")
     .eq("verified", true)
     .order("rating_avg", { ascending: false })
-    .limit(limit);
+    .limit(seed ? SHOP_POOL : limit);
   if (city) q = q.eq("city", city);
   const { data } = await q;
-  return (data ?? []) as unknown as (ShopLite & {
+  const rows = (data ?? []) as unknown as (ShopLite & {
     seller_scores?: { new_seller_boost_until: string | null; total_score: number }[];
   })[];
+
+  if (!seed) return rows;
+  return seededShuffle(rows, seed).slice(0, limit);
 }
 
 /**

@@ -98,6 +98,8 @@ export async function dispatchPush(limit = 50): Promise<DispatchResult> {
   let failed = 0;
   let pruned = 0;
   let lastError: string | undefined;
+  // Rows where EVERY device failed. They are put back in the queue below.
+  const undelivered: string[] = [];
 
   for (const row of rows) {
     const targets = byUser.get(row.user_id) ?? [];
@@ -119,10 +121,12 @@ export async function dispatchPush(limit = 50): Promise<DispatchResult> {
       badge: "/notification-icon-96.png",
     };
 
+    let rowSent = 0;
     for (const t of targets) {
       const outcome = await sendPush(t, payload, config);
       if (outcome.ok) {
         sent += 1;
+        rowSent += 1;
       } else {
         failed += 1;
         lastError = outcome.error;
@@ -134,9 +138,31 @@ export async function dispatchPush(limit = 50): Promise<DispatchResult> {
         }
       }
     }
+
+    // Nothing reached any device: hand the row back so the next flush retries
+    // it. Without this the claim had already stamped `pushed_at`, so a push
+    // service outage silently ate every notification in the batch.
+    if (rowSent === 0) undelivered.push(row.id);
   }
 
-  return { ok: true, configured: true, claimed: rows.length, sent, failed, pruned, error: lastError };
+  // Best-effort: a failure here only means the rows wait for a manual retry,
+  // which is still better than reporting them delivered.
+  if (undelivered.length) {
+    const { error: releaseErr } = await supabase.rpc("release_notification_claim", {
+      p_ids: undelivered,
+    });
+    if (releaseErr) lastError = `${lastError ?? ""} release: ${releaseErr.message}`.trim();
+  }
+
+  return {
+    ok: true,
+    configured: true,
+    claimed: rows.length,
+    sent,
+    failed,
+    pruned,
+    error: lastError,
+  };
 }
 
 /* ── Opportunistic dispatch ──────────────────────────────────────────────────
@@ -164,5 +190,37 @@ export async function dispatchPushThrottled(windowMs = 20_000): Promise<void> {
     await inFlight;
   } catch {
     // Never let a delivery problem break a page render.
+  }
+}
+
+/**
+ * Flush the queue from a page render, bounded so it cannot hang the page.
+ *
+ * ── Why this is awaited, and why it has a cap ──────────────────────────────
+ * The layouts used to call `void dispatchPushThrottled()`. On a serverless
+ * host that is a silent no-op: the response is sent, the function instance is
+ * frozen, and the un-awaited promise is killed mid-flight. The push was
+ * claimed (so `pushed_at` was stamped) and then never sent — the notification
+ * was lost for good, because the claim had already marked it delivered.
+ *
+ * So the work has to finish inside the request. It is capped at
+ * `timeoutMs` so a slow push service cannot hold a page open: the throttle
+ * means only one page load in the window pays this at all, and the cap keeps
+ * even that bounded. A flush that hits the cap is not lost — the rows it did
+ * not reach are still unclaimed and go out on the next flush.
+ */
+export async function dispatchPushSafely(timeoutMs = 3_000): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      dispatchPushThrottled(),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, timeoutMs);
+      }),
+    ]);
+  } catch {
+    // A delivery problem must never break a page render.
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }

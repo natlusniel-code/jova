@@ -1,7 +1,7 @@
 import { Logo, Badge } from "@/components/ui";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { hasAdminKey } from "@/lib/supabase/admin";
-import { dispatchPushThrottled } from "@/lib/push";
+import { dispatchPushSafely } from "@/lib/push";
 import Link from "next/link";
 
 /**
@@ -19,13 +19,17 @@ import Link from "next/link";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "NaijaMart admin" };
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   /* Drive the push queue from the console too. The dispatcher used to run only
    * from the storefront layout, so an admin who lives in the console never
    * flushed anything — and an admin broadcast is precisely a notification that
-   * needs delivering. Throttled and fire-and-forget; never breaks a page. */
+   * needs delivering.
+   *
+   * AWAITED with a 3s cap, not `void`-ed: on a serverless host an un-awaited
+   * promise is killed when the response is sent, after the rows were already
+   * claimed — so the broadcast was marked delivered and never sent. */
   try {
-    void dispatchPushThrottled();
+    await dispatchPushSafely();
   } catch {
     // ignore
   }

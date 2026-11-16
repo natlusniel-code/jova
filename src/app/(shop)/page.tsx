@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { getSession } from "@/lib/supabase/server";
 import {
   getCategories,
@@ -9,6 +10,7 @@ import {
   getWishlistIds,
   ALL_CITIES,
 } from "@/lib/queries";
+import { anonymousSeed } from "@/lib/stable-random";
 import { ListingCard, ShopCard } from "@/components/cards";
 import { GigCard } from "@/components/gig-card";
 import { ListingTabs } from "@/components/listing-tabs";
@@ -36,10 +38,24 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
   // the default is products and `?tab=service` switches to gigs.
   const tab: "product" | "service" = searchParams.tab === "service" ? "service" : "product";
 
+  // ── Which three verified sellers this visitor sees ────────────────────────
+  // The row is random per account but stable for that account: the seed is the
+  // signed-in user's id, so the same buyer always gets the same three shops
+  // while a different buyer gets a different three. An anonymous visitor has
+  // no id, so the seed is derived from the request headers — hashed, never
+  // stored — which keeps the row steady across a few page loads without
+  // recording anything about the person. See src/lib/stable-random.ts.
+  const hdrs = headers();
+  const shopSeed =
+    session?.user.id ??
+    anonymousSeed([hdrs.get("user-agent"), hdrs.get("accept-language")]);
+
   const [categories, places, shops, products, services, savedIds] = await Promise.all([
     getCategories(),
     getPlaces(),
-    getNearbyShops(city, 6),
+    // Three, not six: the storefront row is a taste of the marketplace, and
+    // "See all" is the way to the full directory.
+    getNearbyShops(city, 3, shopSeed),
     // Ranked + rotated daily by storefront_feed (sql/0015): a balanced mix of
     // new, well-rated, best-selling and most-viewed listings rather than
     // "the newest 8", which let the same listings own page one forever.

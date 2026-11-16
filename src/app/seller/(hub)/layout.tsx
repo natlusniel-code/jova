@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession, createClient } from "@/lib/supabase/server";
-import { dispatchPushThrottled } from "@/lib/push";
+import { dispatchPushSafely } from "@/lib/push";
 import { sellerGatePath } from "@/lib/seller-gate";
 import { isBuyerAccount } from "@/lib/roles";
 import { Logo, Badge, Avatar } from "@/components/ui";
@@ -23,9 +23,12 @@ export default async function SellerLayout({ children }: { children: React.React
    * the dispatcher, and a notification waiting on the queue sat there until
    * somebody happened to open a buyer page. Delivery must not depend on which
    * surface a user happens to be on, so every role's shell drives it now.
-   * Throttled to once per 20s per instance, and never awaited. */
+   *
+   * AWAITED with a 3s cap, not `void`-ed: on a serverless host an un-awaited
+   * promise is killed when the response is sent, after the rows were already
+   * claimed — so the notification was marked delivered and never sent. */
   try {
-    void dispatchPushThrottled();
+    await dispatchPushSafely();
   } catch {
     // a delivery problem must never break a page
   }

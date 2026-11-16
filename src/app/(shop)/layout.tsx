@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSellerAccount } from "@/lib/roles";
-import { dispatchPushThrottled } from "@/lib/push";
+import { dispatchPushSafely } from "@/lib/push";
 import { Logo, Avatar } from "@/components/ui";
 import { TabBar } from "@/components/tab-bar";
 import { CartFab } from "@/components/cart-fab";
@@ -58,11 +58,11 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
    * Next 15 would be the tidier home for this, but this app is on 14.2.15,
    * where it does not exist.)
    */
-  try {
-    void dispatchPushThrottled();
-  } catch {
-    // never break a page because a notification could not be sent
-  }
+  // AWAITED, with a 3s cap. `void`-ing this was a silent no-op on a
+  // serverless host: the response is sent, the instance freezes, and the
+  // un-awaited promise dies after the rows were already claimed — so the
+  // notification was marked delivered and never sent. See dispatchPushSafely.
+  await dispatchPushSafely();
 
   // ── Sellers do not shop ──────────────────────────────────────────────────
   // The role is the authority (src/lib/roles.ts): an account with role
