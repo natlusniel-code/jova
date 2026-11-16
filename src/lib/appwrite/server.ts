@@ -37,6 +37,54 @@ type AppwriteUser = {
 };
 
 /**
+ * Accept a Google profile-picture URL, or null.
+ *
+ * ── Why Appwrite cannot give us this directly ─────────────────────────────
+ * Appwrite does NOT expose the Google picture on the user record. `prefs` comes
+ * back as `{}` for an OAuth2 Google user, and their docs are explicit that the
+ * avatar is not part of the session or the user model. The only supported route
+ * is the session's `providerAccessToken` — a Google access token — used against
+ * Google's own userinfo endpoint:
+ *
+ *     GET https://www.googleapis.com/oauth2/v3/userinfo?access_token=…
+ *     → { name, email, picture: "https://lh3.googleusercontent.com/…" }
+ *
+ * That call happens in the BROWSER on `/auth/success`, because that is where
+ * the Appwrite session (and therefore the provider token) lives. The resulting
+ * URL is then handed to this server action.
+ *
+ * ── Why the URL is re-validated here ──────────────────────────────────────
+ * The browser supplied it, so it is untrusted. It ends up in an `<img src>` on
+ * every page the person appears on, so a `javascript:` or `data:` URL would be
+ * an XSS vector, and an arbitrary remote host would be a tracking pixel served
+ * under our pages. Only an https URL on a Google-controlled host is accepted;
+ * anything else is dropped and the account keeps its default avatar.
+ */
+export function googleAvatarUrl(raw: unknown): string | null {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+
+  try {
+    const url = new URL(raw.trim());
+    if (url.protocol !== "https:") return null;
+
+    // Google serves avatars from lh3–lh6.googleusercontent.com; the other hosts
+    // appear for Workspace and older accounts.
+    const host = url.hostname.toLowerCase();
+    const allowed =
+      host === "googleusercontent.com" ||
+      host.endsWith(".googleusercontent.com") ||
+      host === "google.com" ||
+      host.endsWith(".google.com") ||
+      host === "ggpht.com" ||
+      host.endsWith(".ggpht.com");
+
+    return allowed ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Ask Appwrite who a JWT belongs to.
  *
  * Returns null when the JWT is invalid, expired, or belongs to nobody — the
@@ -67,6 +115,44 @@ export async function verifyAppwriteJwt(jwt: string): Promise<AppwriteUser | nul
 }
 
 /**
+ * Give an existing account the Google picture, but only if it has none.
+ *
+ * ── Why this is not part of the create path ───────────────────────────────
+ * A brand-new account is written once, so the avatar goes in with the name and
+ * role. An EXISTING account is a different problem: it may already have an
+ * avatar the person chose, and overwriting it on every Google sign-in would
+ * quietly undo their choice. So this reads the current value first and writes
+ * only when it is empty.
+ *
+ * ── Why failures are swallowed ────────────────────────────────────────────
+ * An avatar is decoration. If this read or write fails, the sign-in must still
+ * succeed — the person keeps their initials and nothing else changes. Throwing
+ * here would turn a cosmetic problem into a failed login.
+ */
+async function backfillGoogleAvatar(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  avatar: string | null,
+): Promise<void> {
+  if (!avatar) return;
+
+  try {
+    const { data } = await admin
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", userId)
+      .maybeSingle();
+
+    // Already has one — theirs wins.
+    if (data?.avatar_url) return;
+
+    await admin.from("profiles").update({ avatar_url: avatar }).eq("id", userId);
+  } catch {
+    // Cosmetic only. Never block a sign-in on it.
+  }
+}
+
+/**
  * Find the Supabase user for an Appwrite identity, creating one if needed.
  *
  * ── Why the email is the join key ───────────────────────────────────────────
@@ -85,7 +171,15 @@ export async function verifyAppwriteJwt(jwt: string): Promise<AppwriteUser | nul
  */
 export async function findOrCreateSupabaseUser(
   appwriteUser: AppwriteUser,
-  opts: { allowCreate?: boolean; role?: "buyer" | "seller" } = {},
+  opts: {
+    allowCreate?: boolean;
+    role?: "buyer" | "seller";
+    /**
+     * The Google profile picture, resolved in the browser from the session's
+     * provider token (see `googleAvatarUrl`). Untrusted — re-validated there.
+     */
+    avatarUrl?: string | null;
+  } = {},
 ): Promise<{ userId: string; email: string; created: boolean } | null> {
   const email = appwriteUser.email?.trim().toLowerCase();
   if (!email) return null;
@@ -110,6 +204,13 @@ export async function findOrCreateSupabaseUser(
       // An existing account signing in with Google keeps its own role. We do
       // NOT overwrite it: someone who is already a seller must not be demoted
       // to buyer just because they used the buyer signup page.
+      //
+      // The Google picture is backfilled here, but ONLY when the profile has
+      // no avatar of its own. Someone who uploaded a picture, or whose avatar
+      // was set by an earlier flow, must not have it replaced by Google's on
+      // every sign-in — that would silently undo their choice.
+      await backfillGoogleAvatar(admin, match.id, googleAvatarUrl(opts.avatarUrl));
+
       return { userId: match.id, email, created: false };
     }
 
@@ -161,12 +262,20 @@ export async function findOrCreateSupabaseUser(
   // where to send them — and a seller must go to onboarding, not the
   // storefront. The name from Google is copied in too, so the profile is
   // populated before the person ever sees a form.
+  //
+  // The Google picture is copied in as well, so a new account has a real
+  // avatar from the first page it renders instead of initials. It is only
+  // written when Google actually supplied one — an empty string would
+  // overwrite nothing useful and would make `Avatar` render a broken image
+  // rather than falling back to initials.
+  const avatar = googleAvatarUrl(opts.avatarUrl);
   try {
     await admin
       .from("profiles")
       .update({
         full_name: appwriteUser.name ?? email.split("@")[0],
         role: opts.role ?? "buyer",
+        ...(avatar ? { avatar_url: avatar } : {}),
       })
       .eq("id", userId);
   } catch {

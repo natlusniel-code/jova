@@ -235,6 +235,54 @@ export async function createAppwriteJwt(): Promise<string> {
   return jwt;
 }
 
+/**
+ * The signed-in Google account's profile picture URL, or null.
+ *
+ * ── Why this needs Google, not Appwrite ───────────────────────────────────
+ * Appwrite does not expose the Google picture anywhere convenient: `prefs` is
+ * `{}` for an OAuth2 user and the user model has no avatar field. The one
+ * supported route is the session's `providerAccessToken` — the Google access
+ * token Appwrite obtained during the OAuth exchange — used against Google's
+ * userinfo endpoint, which returns `picture`.
+ *
+ * ── Why it never throws ───────────────────────────────────────────────────
+ * An avatar is decoration. If Google is slow, the token has no `openid`/
+ * `profile` scope, or the call fails, sign-in must still complete. Every
+ * failure path returns null and the account keeps the default avatar.
+ *
+ * ── Why the URL is checked here as well as on the server ──────────────────
+ * The value crosses into a server action and then into an `<img src>`. This
+ * local check keeps an obviously wrong value (an empty string, a non-https
+ * URL) from even making the round trip; the server re-validates the host,
+ * because a browser can send anything.
+ */
+export async function fetchGoogleAvatarUrl(): Promise<string | null> {
+  try {
+    const { account } = appwrite();
+
+    // `getSession("current")` returns the live session including the provider
+    // tokens. A session created from a token (our flow) still carries them.
+    const session = await account.getSession({ sessionId: "current" });
+    const token = session?.providerAccessToken;
+    if (!token) return null;
+
+    const res = await fetch(
+      `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${encodeURIComponent(token)}`,
+      { cache: "no-store" },
+    );
+    if (!res.ok) return null;
+
+    const profile = (await res.json()) as { picture?: unknown };
+    const picture = profile?.picture;
+    if (typeof picture !== "string" || !picture.startsWith("https://")) {
+      return null;
+    }
+    return picture;
+  } catch {
+    return null;
+  }
+}
+
 /** Sign out of Appwrite. Awaited by the caller before navigating. */
 export async function signOutOfAppwrite(): Promise<void> {
   const { account } = appwrite();

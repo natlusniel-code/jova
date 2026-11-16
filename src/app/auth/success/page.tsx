@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { completeOAuthSignIn, createAppwriteJwt, readGoogleIntent, signOutOfAppwrite } from "@/lib/appwrite/client";
+import { completeOAuthSignIn, createAppwriteJwt, fetchGoogleAvatarUrl, readGoogleIntent, signOutOfAppwrite } from "@/lib/appwrite/client";
 import { bridgeGoogleSession } from "@/app/auth/google-actions";
 import { Spinner, Alert } from "@/components/ui";
 
@@ -56,12 +56,20 @@ export default function AuthSuccessPage() {
         // the query string; the server is what enforces it.
         const intent = readGoogleIntent();
         const jwt = await createAppwriteJwt();
+
+        // The Google profile picture, read here because the Appwrite session
+        // (and therefore the provider token) only exists in this browser. It
+        // is null when Google shared no picture or the call failed — the
+        // account then keeps the default avatar and sign-in is unaffected.
+        const avatarUrl = await fetchGoogleAvatarUrl();
+
         const result = await bridgeGoogleSession({
           userId,
           jwt,
           mode: intent.mode,
           role: intent.role,
           next: intent.next,
+          avatarUrl,
         });
 
         if (!result.ok) {

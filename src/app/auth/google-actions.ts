@@ -39,6 +39,11 @@ export async function bridgeGoogleSession(input: {
   mode?: "signin" | "signup";
   role?: "buyer" | "seller";
   next?: string | null;
+  /**
+   * The Google profile picture, resolved in the browser from the Appwrite
+   * session's provider token. Untrusted: re-validated in googleAvatarUrl().
+   */
+  avatarUrl?: string | null;
 }): Promise<GoogleBridgeResult> {
   const claimedId = String(input?.userId ?? "").trim();
   const jwt = String(input?.jwt ?? "").trim();
@@ -89,6 +94,7 @@ export async function bridgeGoogleSession(input: {
     resolved = await findOrCreateSupabaseUser(appwriteUser, {
       allowCreate: mode === "signup",
       role,
+      avatarUrl: input?.avatarUrl ?? null,
     });
   } catch (e) {
     if (e instanceof NoAccountError) {

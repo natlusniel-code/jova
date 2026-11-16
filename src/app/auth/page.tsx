@@ -59,13 +59,12 @@ export default async function AuthPage({
           edge, and the wrapper added only `mb-4`. On a phone that read as
           one crowded block — the button sat on top of the caption.
 
-          The overlap is kept (it is what makes the two read as one object)
-          but it is now a deliberate, smaller overlap, and the space below
-          the panel is opened up so the button, the helper line and the
-          "Create an account" link each have room. */}
-      <div className="mb-1">
-        <SignInVideo src={media.video} poster={media.poster} />
-      </div>
+          The overlap is gone entirely. The panel now sits below the video
+          with a clear `mt-6` gap, so the video's caption is fully readable
+          and the button has its own space. The glass card still reads as
+          part of the same screen because it shares the video's width and
+          radius, not because it is glued to it. */}
+      <SignInVideo src={media.video} poster={media.poster} />
       <LoginGlassPanel next={next} noAccount={noAccount} errorMessage={errorMessage} />
     </AuthSplit>
   );
