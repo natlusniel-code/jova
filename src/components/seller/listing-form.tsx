@@ -8,6 +8,17 @@ import { naira, discountPercent } from "@/lib/utils";
 import { AiListingPanel } from "@/components/seller/ai-listing-panel";
 import { PRODUCT_FRAME_FIT, PRODUCT_TILE_SIZE } from "@/lib/image-frame";
 
+/** The three gig tiers, matching the `gig_packages.tier` check constraint. */
+type PlanTier = "basic" | "standard" | "premium";
+
+/** One tier's draft, as typed into the create form. */
+type PlanDraft = {
+  name: string;
+  price: string;
+  delivery_days: string;
+  features: string; // one per line
+};
+
 /**
  * Read a file's real pixel dimensions.
  *
@@ -86,6 +97,52 @@ export function ListingForm({
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
+
+  /**
+   * ── Gig plans, captured at creation ────────────────────────────────
+   * A service gig is priced in tiers (Basic / Standard / Premium), and
+   * `gig_packages` (sql/0021) is where those live. Until now the tiers
+   * could only be added AFTER the gig existed, on the edit page — so a
+   * seller publishing their first gig had no way to offer a Standard or
+   * Premium plan at all, and the buyer saw a single starting price.
+   *
+   * The rows are written immediately after the listing insert, because
+   * `gig_packages.listing_id` is a foreign key: the gig has to exist
+   * first. That is why this is a second step in `save()` rather than
+   * part of the listing payload.
+   *
+   * Only a NEW service listing shows this. An existing gig edits its
+   * plans through the full PlanEditor on the edit page, which can also
+   * delete a tier — duplicating that here would give two editors that
+   * could disagree.
+   */
+  const [plans, setPlans] = useState<Record<PlanTier, PlanDraft>>({
+    basic: { name: "Basic", price: "", delivery_days: "", features: "" },
+    standard: { name: "Standard", price: "", delivery_days: "", features: "" },
+    premium: { name: "Premium", price: "", delivery_days: "", features: "" },
+  });
+  const [openPlan, setOpenPlan] = useState<PlanTier | "">("basic");
+
+  function patchPlan(tier: PlanTier, key: keyof PlanDraft, value: string) {
+    setPlans((prev) => ({ ...prev, [tier]: { ...prev[tier], [key]: value } }));
+  }
+
+  /** A tier is offered only when it has a price. Blank means "not offered". */
+  function planRows() {
+    return (Object.keys(plans) as PlanTier[])
+      .filter((tier) => Number(plans[tier].price) > 0)
+      .map((tier, index) => ({
+        tier,
+        name: plans[tier].name.trim() || tier.charAt(0).toUpperCase() + tier.slice(1),
+        price: Number(plans[tier].price),
+        delivery_days: plans[tier].delivery_days ? Number(plans[tier].delivery_days) : null,
+        features: plans[tier].features
+          .split("\n")
+          .map((f) => f.trim())
+          .filter(Boolean),
+        sort_order: index,
+      }));
+  }
 
   async function pickImage(file: File) {
     if (images.length >= 6) { setErr("Up to 6 photos per listing."); return; }
@@ -208,12 +265,51 @@ export function ListingForm({
       status,
     };
 
-    const { error } = editing
-      ? await supabase.from("listings").update(payload).eq("id", listing.id)
-      : await supabase.from("listings").insert(payload);
+    const { data, error } = editing
+      ? await supabase.from("listings").update(payload).eq("id", listing.id).select("id")
+      : await supabase.from("listings").insert(payload).select("id");
 
     setBusy("");
     if (error) { setErr(error.message); return; }
+    // ── Why the row count is checked ───────────────────────────────────
+    // An UPDATE that RLS filters out returns `error: null` and writes
+    // nothing. Without this check the seller was sent to /seller/listings
+    // as if the edit had saved, and the old values were still there. The
+    // `.select("id")` above makes the database report what it wrote.
+    if (!data || data.length === 0) {
+      setErr(
+        editing
+          ? "That listing was not saved. It may have been removed, or your shop is not active."
+          : "That listing was not created. Check that your shop is approved.",
+      );
+      return;
+    }
+
+    // ── Write the gig plans, now that the gig has an id ────────────────
+    // `gig_packages.listing_id` is a foreign key, so this cannot be part
+    // of the insert above. Only a NEW service listing reaches here with
+    // plans to write: an existing gig edits them on the edit page.
+    //
+    // A failure here is reported rather than swallowed. The gig itself
+    // saved, so the seller is told exactly that — "your gig is live, but
+    // the plans did not save" — and sent to the edit page where the full
+    // PlanEditor can retry. Silently dropping the plans would leave a gig
+    // advertising a starting price with no tiers behind it.
+    const rows = type === "service" && !editing ? planRows() : [];
+    if (rows.length > 0) {
+      const listingId = (data[0] as { id: string }).id;
+      const { error: planError } = await supabase.from("gig_packages").insert(
+        rows.map((r) => ({ ...r, listing_id: listingId })),
+      );
+      if (planError) {
+        setErr(
+          `Your gig was saved, but its plans were not: ${planError.message}. ` +
+            `Open the gig to add them again.`,
+        );
+        return;
+      }
+    }
+
     router.push("/seller/listings");
     router.refresh();
   }
@@ -454,6 +550,138 @@ export function ListingForm({
               <div className="rounded-xl bg-brand-50/70 px-3 py-2 text-[11.5px] leading-relaxed text-brand-900">
                 Services carry <strong>no delivery fee</strong> — a gig is performed, not shipped.
               </div>
+            </div>
+          )}
+
+          {/* ---------------------------------------------------------------
+              Gig plans — Basic / Standard / Premium.
+
+              A service is rarely one price: a logo gig is a different job
+              at ₦15,000 and at ₦60,000. `gig_packages` (sql/0021) holds one
+              row per tier, and the buyer picks a tier on the gig page; the
+              chosen tier travels on the order line and `place_order` prices
+              the line from it.
+
+              Shown only for a NEW service listing. An existing gig edits
+              its plans through the full PlanEditor on the edit page, which
+              can also delete a tier — two editors for one table would be
+              two sources of truth.
+
+              A tier with no price is simply not offered. That is why the
+              price box is the switch: blank means "I don't sell this tier",
+              which is clearer than a checkbox the seller has to remember to
+              tick, and it cannot produce a ₦0 plan.
+             --------------------------------------------------------------- */}
+          {type === "service" && !editing && (
+            <div className="rounded-xl border border-[var(--line)] bg-slate-50/60 p-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-1">
+                <label className="nm-label !mb-0">Plans for this gig</label>
+                <span className="text-[11px] text-ink-400">optional</span>
+              </div>
+              <p className="mt-1 text-[11px] leading-relaxed text-ink-500">
+                Offer up to three tiers. Buyers pick one on your gig page. Leave a
+                price empty to skip that tier — you can add or change plans later.
+              </p>
+
+              <div className="mt-2.5 space-y-2">
+                {(["basic", "standard", "premium"] as const).map((tier) => {
+                  const d = plans[tier];
+                  const open = openPlan === tier;
+                  const offered = Number(d.price) > 0;
+                  return (
+                    <div
+                      key={tier}
+                      className={`overflow-hidden rounded-xl border bg-white ${
+                        offered ? "border-brand-300" : "border-dashed border-[var(--line)]"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setOpenPlan(open ? "" : tier)}
+                        aria-expanded={open}
+                        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition hover:bg-slate-50"
+                      >
+                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-50 text-[11.5px] font-bold text-brand-700">
+                          {tier.slice(0, 1).toUpperCase()}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[12.5px] font-bold text-ink-900">
+                            {d.name.trim() || tier.charAt(0).toUpperCase() + tier.slice(1)}
+                          </span>
+                          <span className="mt-0.5 block text-[11px] text-ink-500">
+                            {offered ? (
+                              <>
+                                <span className="font-semibold text-ink-800">{naira(Number(d.price))}</span>
+                                {d.delivery_days && <> · {d.delivery_days}-day delivery</>}
+                              </>
+                            ) : (
+                              "not offered"
+                            )}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-[11px] font-semibold text-brand-600">
+                          {open ? "Close" : offered ? "Edit" : "Add"}
+                        </span>
+                      </button>
+
+                      {open && (
+                        <div className="space-y-2.5 border-t border-[var(--line)] bg-slate-50/50 px-3 py-2.5">
+                          <div className="grid gap-2.5 sm:grid-cols-2">
+                            <label className="block">
+                              <span className="nm-label">Plan name</span>
+                              <input
+                                className="nm-input"
+                                value={d.name}
+                                onChange={(e) => patchPlan(tier, "name", e.target.value)}
+                                placeholder={tier.charAt(0).toUpperCase() + tier.slice(1)}
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="nm-label">Price (₦)</span>
+                              <input
+                                className="nm-input"
+                                inputMode="numeric"
+                                value={d.price}
+                                onChange={(e) => patchPlan(tier, "price", e.target.value.replace(/\D/g, ""))}
+                                placeholder="e.g. 25000"
+                              />
+                            </label>
+                          </div>
+                          <label className="block">
+                            <span className="nm-label">Delivery (days)</span>
+                            <input
+                              className="nm-input"
+                              inputMode="numeric"
+                              value={d.delivery_days}
+                              onChange={(e) => patchPlan(tier, "delivery_days", e.target.value.replace(/\D/g, ""))}
+                              placeholder="e.g. 3"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="nm-label">What the buyer gets</span>
+                            <textarea
+                              className="nm-input min-h-[64px] resize-y"
+                              value={d.features}
+                              onChange={(e) => patchPlan(tier, "features", e.target.value)}
+                              placeholder={"One per line, e.g.\n2 logo concepts\n3 revisions\nSource files"}
+                            />
+                            <span className="mt-1 block text-[11px] leading-relaxed text-ink-400">
+                              One item per line. These become the bullet list on the plan card.
+                            </span>
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {planRows().length === 0 && (
+                <p className="mt-2 text-[11px] leading-relaxed text-ink-400">
+                  No plans yet — buyers will see your starting price of{" "}
+                  {form.price ? naira(Number(form.price)) : "the price above"}.
+                </p>
+              )}
             </div>
           )}
 

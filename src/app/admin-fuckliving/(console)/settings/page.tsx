@@ -3,8 +3,10 @@ import { Card, Badge } from "@/components/ui";
 import { SettingsForm } from "@/components/admin/settings-form";
 import { CategoryManager } from "@/components/admin/category-manager";
 import { PlanEditor } from "@/components/admin/plan-editor";
+import { LoginVideoEditor } from "@/components/admin/login-video-editor";
 import { naira } from "@/lib/utils";
 import { getSellerPlans } from "@/lib/plan-gate";
+import { DEFAULT_LOGIN_POSTER, DEFAULT_LOGIN_VIDEO } from "@/lib/login-media";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings" };
@@ -60,6 +62,19 @@ export default async function AdminSettingsPage() {
         </p>
         <PlanEditor plans={plans} />
       </Card>
+
+      {/* ── Login page video ─────────────────────────────────────────────
+          The video on /auth is the first thing every signed-out visitor
+          sees, so it is content the admin needs to change without a
+          deploy. The editor writes `platform_settings.login_video_url`
+          (sql/0047) and the login page reads it server-side, so a save is
+          live on the next request. */}
+      <LoginVideoEditor
+        initialVideo={settings?.login_video_url ?? ""}
+        initialPoster={settings?.login_video_poster_url ?? ""}
+        defaultVideo={DEFAULT_LOGIN_VIDEO}
+        defaultPoster={DEFAULT_LOGIN_POSTER}
+      />
 
       <Card className="p-4">
         <p className="text-[14px] font-bold text-ink-900">Categories</p>

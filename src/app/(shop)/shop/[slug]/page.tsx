@@ -5,7 +5,8 @@ import type { Metadata } from "next";
 import { getSession, createClient } from "@/lib/supabase/server";
 import { getShopBySlug, getShopListings, getShopReviews, getWishlistIds } from "@/lib/queries";
 import { naira, shortDate } from "@/lib/utils";
-import { Star, VerifiedBadge, Badge, Avatar, EmptyState } from "@/components/ui";
+import { Star, VerifiedBadge, PremiumBadge, Badge, Avatar, EmptyState } from "@/components/ui";
+import { isPremiumSeller } from "@/lib/plan-gate";
 import { ListingCard } from "@/components/cards";
 import { FollowButton } from "@/components/follow-button";
 import { ChatPill } from "@/components/chat-pill";
@@ -175,6 +176,10 @@ export default async function ShopPage({ params }: { params: { slug: string } })
             <div className="flex flex-wrap items-center gap-1.5">
               <h1 className="truncate text-[17px] font-extrabold tracking-tight text-ink-900">{shop.name}</h1>
               {shop.verified && <VerifiedBadge />}
+              {/* The Premium badge. `isPremiumSeller` requires a LIVE
+                  subscription, not just the plan column — a lapsed seller
+                  must not keep advertising a tier they stopped paying for. */}
+              {isPremiumSeller(shop) && <PremiumBadge />}
             </div>
             <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11.5px] text-ink-500">
               <Star value={Number(shop.rating_avg)} count={shop.rating_count} />

@@ -20,9 +20,29 @@ import { useEffect, useRef, useState } from "react";
  * downloads. So it is a contained panel with a poster frame, `preload="auto"`
  * only after mount, and `playsInline` so iOS does not hijack it into fullscreen.
  */
-export function SignInVideo() {
+export function SignInVideo({
+  src = "/media/signin.mp4",
+  poster = "/media/signin-poster.jpg",
+}: {
+  /**
+   * Both default to the bundled files, so the component works with no
+   * configuration. The admin dashboard can override them from
+   * `platform_settings` (sql/0047) — see `getLoginMedia()` in
+   * src/lib/login-media.ts. An empty string is treated as "use the
+   * default", which is what the settings row stores before anyone edits it.
+   */
+  src?: string;
+  poster?: string;
+}) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const [ready, setReady] = useState(false);
+
+  // A changed URL must restart the fade-in, otherwise the new video appears
+  // at opacity 0 and never becomes visible because `canplay` already fired
+  // for the previous source.
+  useEffect(() => {
+    setReady(false);
+  }, [src]);
 
   useEffect(() => {
     const v = ref.current;
@@ -48,8 +68,8 @@ export function SignInVideo() {
       <video
         ref={ref}
         className={`h-40 w-full object-cover transition-opacity duration-500 sm:h-48 ${ready ? "opacity-100" : "opacity-0"}`}
-        src="/media/signin.mp4"
-        poster="/media/signin-poster.jpg"
+        src={src}
+        poster={poster}
         autoPlay
         loop
         muted

@@ -69,6 +69,17 @@ export type ShopLite = {
   category: string | null;
   status: string;
   subscription_status: string;
+  /**
+   * 'basic' | 'premium'. Required for the Premium badge on the storefront.
+   *
+   * This was missing from `SHOP_COLS`, so every shop card and the shop page
+   * received `undefined` and the badge could never render — the same class
+   * of bug that once made the subscription page show "Basic" to a Premium
+   * seller. A column a component reads must be in the select.
+   */
+  plan: string | null;
+  /** Needed by `isPremiumSeller()` — a lapsed subscription must not show the badge. */
+  subscription_expires_at: string | null;
   description: string | null;
   pickup_available: boolean;
   delivery_fee: number;
@@ -85,7 +96,7 @@ export type Place = { city: string; state: string | null; shop_count: number };
 export const ALL_CITIES = "all";
 
 const SHOP_COLS =
-  "id,name,slug,city,state,verified,rating_avg,rating_count,logo_url,banner_url,kind,category,status,subscription_status,description,pickup_available,delivery_fee,free_delivery_threshold,orders_delivered,shop_address,shop_lat,shop_lng";
+  "id,name,slug,city,state,verified,rating_avg,rating_count,logo_url,banner_url,kind,category,status,subscription_status,plan,subscription_expires_at,description,pickup_available,delivery_fee,free_delivery_threshold,orders_delivered,shop_address,shop_lat,shop_lng";
 
 /**
  * The columns every listing card needs, in one place.

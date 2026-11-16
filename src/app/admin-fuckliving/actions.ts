@@ -225,21 +225,33 @@ export async function setShopStatus(
  */
 export async function toggleShopSuspend(
   shopId: string,
-  suspended: boolean,
+  action: "suspend" | "reactivate",
+  reason?: string,
 ): Promise<ActionResult> {
   const admin = await requireAdmin();
   if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
+
+  // ── Why this takes the ACTION, not the current state ──────────────────
+  // It used to take `suspended: boolean` — the shop's CURRENT status — and
+  // write `suspended ? 'suspended' : 'approved'`. The caller passed
+  // `status === 'suspended'`, so clicking "Reactivate" on a suspended shop
+  // passed `true` and wrote 'suspended' again. The button could suspend but
+  // never reactivate, and it reported success both times.
+  //
+  // Naming the transition removes the whole class of bug: there is no way
+  // to express "set it to what it already is".
+  if (action === "suspend" && !reason?.trim()) {
+    return { ok: false, error: "Write a short reason — the seller receives it." };
+  }
 
   try {
     const supabase = createAdminClient();
 
     const { error } = await supabase.rpc("admin_set_shop_status", {
       p_shop_id: shopId,
-      p_status: suspended ? "suspended" : "approved",
-      // A suspension needs a note the seller can read; the toggle has no
-      // free-text field, so it states the reason itself.
-      p_note: suspended ? "Suspended by an administrator." : null,
+      p_status: action === "suspend" ? "suspended" : "approved",
+      p_note: action === "suspend" ? reason!.trim() : null,
       p_verified: null,
       p_actor: admin.userId,
     });
@@ -277,18 +289,56 @@ export async function moderateReview(
 /* ─────────────────────────────────────────────────────────────────────────────
  * Buyers
  * ──────────────────────────────────────────────────────────────────────────── */
-export async function setBuyerBanned(profileId: string, banned: boolean): Promise<ActionResult> {
+/**
+ * Suspend, ban or reactivate ANY account — buyer or seller.
+ *
+ * ── Why this replaced `setBuyerBanned` ────────────────────────────────
+ * The old action wrote `profiles.is_banned` directly with the service-role
+ * client. That is a raw UPDATE, and it had two problems:
+ *
+ *   1. It only ever touched `profiles`. A banned SELLER kept a live shop
+ *      and kept selling — the console had no way to take a seller's
+ *      account down at all, only their shop.
+ *   2. It collapsed three different states into one boolean. "Suspended"
+ *      (temporary, reversible, you can still read your orders) and
+ *      "banned" (permanent) are different things to the person on the
+ *      other end, and the console needs to say which one it did.
+ *
+ * `admin_moderate_user` (sql/0047) owns the transition: it writes the
+ * status, the reason, the expiry and the audit columns, keeps the legacy
+ * `is_banned` in step so the fifteen checkout RPCs that read it stay
+ * correct, and takes a seller's shop down with them.
+ *
+ * `p_actor` is passed explicitly because a Server Action runs with the
+ * service-role client, where `auth.uid()` is null — the RPC cannot infer
+ * who is acting, and the audit trail needs to know.
+ */
+export async function moderateUser(
+  userId: string,
+  action: "suspend" | "ban" | "reactivate",
+  reason?: string,
+  until?: string | null,
+): Promise<ActionResult> {
   const admin = await requireAdmin();
   if (!admin.ok) return { ok: false, error: admin.error };
   if (!hasAdminKey) return { ok: false, error: NO_KEY };
 
+  if (action !== "reactivate" && !reason?.trim()) {
+    return { ok: false, error: "Write a short reason — the account holder sees it." };
+  }
+
   try {
     const supabase = createAdminClient();
-    const { error } = await supabase
-      .from("profiles")
-      .update({ is_banned: banned })
-      .eq("id", profileId);
+
+    const { error } = await supabase.rpc("admin_moderate_user", {
+      p_user_id: userId,
+      p_action: action,
+      p_reason: action === "reactivate" ? null : reason!.trim(),
+      p_actor: admin.userId,
+      p_until: action === "suspend" ? (until ?? null) : null,
+    });
     if (error) return fail(error);
+
     refreshAdmin();
     return { ok: true };
   } catch (error) {
@@ -329,6 +379,68 @@ export async function saveSettings(input: {
     if (error) return fail(error);
 
     refreshAdmin(["/checkout", "/seller/subscription"]);
+    return { ok: true };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/**
+ * The login page video, editable from the dashboard.
+ *
+ * ── Why this is a setting and not a file swap ─────────────────────────
+ * The video used to be hardcoded to `/media/signin.mp4` in the component,
+ * so changing it meant a code change and a deploy. It now lives in
+ * `platform_settings` (sql/0047), which the login page already reads
+ * through the publicly-readable `settings_read` policy — so the page can
+ * render it without a service key, and a change here is live on the next
+ * request.
+ *
+ * An empty value is meaningful: it means "use the bundled file". That
+ * keeps a fresh install working before anyone uploads anything, and it
+ * gives the admin a way back to the default without knowing the path.
+ *
+ * Only http(s) URLs are accepted. A `javascript:` or `data:` URL in a
+ * `<video src>` is an injection vector, and this value is rendered on the
+ * one page every signed-out visitor sees.
+ */
+export async function saveLoginVideo(input: {
+  video_url: string;
+  poster_url: string;
+}): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin.ok) return { ok: false, error: admin.error };
+  if (!hasAdminKey) return { ok: false, error: NO_KEY };
+
+  const clean = (raw: string, label: string): { ok: true; value: string } | { ok: false; error: string } => {
+    const v = (raw ?? "").trim();
+    if (v === "") return { ok: true, value: "" };
+    if (!/^https?:\/\//i.test(v)) {
+      return { ok: false, error: `${label} must be a full http(s) URL, or empty to use the default.` };
+    }
+    if (v.length > 2048) return { ok: false, error: `${label} is too long.` };
+    return { ok: true, value: v };
+  };
+
+  const video = clean(input.video_url, "Video URL");
+  if (!video.ok) return { ok: false, error: video.error };
+  const poster = clean(input.poster_url, "Poster URL");
+  if (!poster.ok) return { ok: false, error: poster.error };
+
+  try {
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from("platform_settings")
+      .update({
+        login_video_url: video.value,
+        login_video_poster_url: poster.value,
+      })
+      .eq("id", 1);
+    if (error) return fail(error);
+
+    // The login page is a Server Component that reads this row, so it has
+    // to be revalidated or the old video keeps rendering from cache.
+    refreshAdmin(["/auth", "/signin"]);
     return { ok: true };
   } catch (error) {
     return fail(error);

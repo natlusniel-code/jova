@@ -38,8 +38,8 @@ export function LoginGlassPanel({
   errorMessage?: string;
 }) {
   return (
-    <div className="-mt-7 px-1.5">
-      <div className="relative overflow-hidden rounded-2xl border border-white/60 bg-white/60 p-4 shadow-[0_8px_32px_-8px_rgba(15,23,42,0.22)] backdrop-blur-xl backdrop-saturate-150">
+    <div className="-mt-5 px-1.5">
+      <div className="relative overflow-hidden rounded-2xl border border-white/60 bg-white/60 p-5 shadow-[0_8px_32px_-8px_rgba(15,23,42,0.22)] backdrop-blur-xl backdrop-saturate-150">
         {/* The glass sheen: a faint diagonal highlight across the top-left. */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/70 via-white/10 to-white/0" />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
@@ -82,13 +82,13 @@ export function LoginGlassPanel({
             className="!bg-white/85 hover:!bg-white !text-ink-900 !shadow-none border !border-slate-200/80 backdrop-blur"
           />
 
-          <p className="mt-3 text-center text-[11.5px] leading-relaxed text-ink-500">
+          <p className="mt-3.5 text-center text-[11.5px] leading-relaxed text-ink-500">
             We&apos;ll use your Google name and email. Nothing is posted to Google.
           </p>
         </div>
       </div>
 
-      <p className="mt-5 text-center text-[13px] text-ink-500">
+      <p className="mt-6 text-center text-[13px] text-ink-500">
         New to NaijaMart?{" "}
         <Link
           href="/signup"
@@ -98,7 +98,7 @@ export function LoginGlassPanel({
         </Link>
       </p>
 
-      <p className="mt-4 text-center text-[11.5px] leading-relaxed text-ink-400">
+      <p className="mt-5 text-center text-[11.5px] leading-relaxed text-ink-400">
         By continuing you agree to our{" "}
         <Link href="/legal/terms" className="underline">
           Terms

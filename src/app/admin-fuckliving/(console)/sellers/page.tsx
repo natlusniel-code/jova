@@ -4,6 +4,7 @@ import { toPublicUrl, toPublicUrls } from "@/lib/storage";
 import { naira, shortDate } from "@/lib/utils";
 import { Card, Badge, EmptyState, Tabs } from "@/components/ui";
 import { SellerDecision, SellerSuspend } from "@/components/admin/seller-actions";
+import { ModerationControls } from "@/components/admin/moderation-controls";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Sellers" };
@@ -18,6 +19,22 @@ export default async function AdminSellersPage({ searchParams }: { searchParams:
     .order("created_at", { ascending: false });
 
   const list = shops ?? [];
+
+  // ── Why the owner is fetched separately ──────────────────────────────
+  // `shops.owner_id` references `auth.users`, not `profiles`, so PostgREST
+  // has no foreign key to embed through. One extra query keyed on the
+  // owner ids is the honest way to get each seller's account state.
+  const ownerIds = Array.from(
+    new Set(list.map((s: any) => s.owner_id).filter(Boolean)),
+  ) as string[];
+  const { data: owners } = ownerIds.length
+    ? await supabase
+        .from("profiles")
+        .select("id,full_name,moderation_status,moderation_reason")
+        .in("id", ownerIds)
+    : { data: [] as any[] };
+  const ownerById = new Map(((owners ?? []) as any[]).map((o: any) => [o.id, o]));
+
   const apps = list.filter((s: any) => s.status === "pending");
   const active = list.filter((s: any) => s.status === "approved");
   const suspended = list.filter((s: any) => s.status === "suspended");
@@ -131,7 +148,7 @@ export default async function AdminSellersPage({ searchParams }: { searchParams:
                     <th className="px-2 py-2 font-semibold">City</th>
                     <th className="px-2 py-2 font-semibold">Category</th>
                     <th className="px-2 py-2 font-semibold">Subscription</th>
-                    <th className="px-2 py-2 font-semibold">Delivery</th>
+                    <th className="px-2 py-2 font-semibold">Account</th>
                     <th className="px-4 py-2 font-semibold">Action</th>
                   </tr>
                 </thead>
@@ -149,7 +166,27 @@ export default async function AdminSellersPage({ searchParams }: { searchParams:
                           {s.subscription_status}
                         </Badge>
                       </td>
-                      <td className="px-2 py-2 text-ink-600">{naira(s.delivery_fee)}</td>
+                      <td className="px-2 py-2">
+                        {/* Account-level moderation, distinct from the shop
+                            toggle beside it: suspending the ACCOUNT stops
+                            the person signing in and ordering; suspending
+                            the SHOP only takes their listings down. */}
+                        {s.owner_id ? (
+                          <ModerationControls
+                            userId={s.owner_id}
+                            name={ownerById.get(s.owner_id)?.full_name || s.name}
+                            status={
+                              (ownerById.get(s.owner_id)?.moderation_status ?? "active") as
+                                | "active"
+                                | "suspended"
+                                | "banned"
+                            }
+                            reason={ownerById.get(s.owner_id)?.moderation_reason}
+                          />
+                        ) : (
+                          <span className="text-[11px] text-ink-400">unclaimed</span>
+                        )}
+                      </td>
                       <td className="px-4 py-2"><SellerSuspend shopId={s.id} status={s.status} /></td>
                     </tr>
                   ))}

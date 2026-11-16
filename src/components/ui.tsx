@@ -69,6 +69,38 @@ export function VerifiedBadge({ className }: { className?: string }) {
   );
 }
 
+/**
+ * The Premium seller badge, shown on the buyer storefront.
+ *
+ * ── Why it is a separate badge from Verified ──────────────────────────
+ * They mean different things and a shop can have one without the other.
+ * "Verified" is about identity — the seller sent ID and bank details and
+ * an admin checked them. "Premium" is about the subscription they pay
+ * for. Collapsing them would tell a buyer that a paying seller is
+ * identity-checked when they may not be, which is the one claim this
+ * badge must not make.
+ *
+ * The amber tone is deliberate: it is the only non-green badge in the
+ * trust row, so it reads as a distinct tier at a glance rather than
+ * blending into the Verified chip beside it.
+ */
+export function PremiumBadge({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11.5px] font-semibold text-amber-800",
+        className,
+      )}
+      title="Premium seller"
+    >
+      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+        <path d="M12 2.6l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 8.8l5.9-.9L12 2.6Z" />
+      </svg>
+      Premium
+    </span>
+  );
+}
+
 export function OrderStatusChip({ status }: { status: string }) {
   const map: Record<string, { label: string; tone: keyof typeof TONES }> = {
     pending_payment: { label: "Pending payment", tone: "amber" },

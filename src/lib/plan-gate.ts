@@ -28,16 +28,29 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 
-export type PlanId = "basic" | "premium";
+/**
+ * ── The pure rules live in `plan-rules.ts` ────────────────────────────
+ * `isPremiumSeller`, `subscriptionState` and `upgradePath` need no
+ * database, and the storefront renders the Premium badge from a CLIENT
+ * component (`cards.tsx`). Importing them from this file — which carries
+ * `server-only` — failed the build with "You're importing a component
+ * that needs server-only".
+ *
+ * They now live in a module that is safe on both sides, and are
+ * re-exported here so every existing server import keeps working with no
+ * change. The `server-only` guard stays: it is what keeps the service-role
+ * client out of the browser bundle.
+ */
+export {
+  isPremiumSeller,
+  subscriptionState,
+  upgradePath,
+  type PlanId,
+  type SellerPlan,
+  type SubscriptionState,
+} from "@/lib/plan-rules";
 
-export type SellerPlan = {
-  id: PlanId;
-  name: string;
-  tagline: string | null;
-  price: number;
-  features: { key?: string; label: string; included: boolean }[];
-  recommended: boolean;
-};
+import type { PlanId, SellerPlan, SubscriptionState } from "@/lib/plan-rules";
 
 /**
  * The feature keys the app gates on.
@@ -163,59 +176,7 @@ export async function shopHasFeature(shopId: string, feature: FeatureKey): Promi
   return data === true;
 }
 
-/**
- * The subscription state of a shop, in the terms the UI needs.
- *
- * `active` is the only state that unlocks features. `pending` means a
- * receipt is waiting for an admin; `expired` means it lapsed; `none` means
- * they never paid.
- */
-export type SubscriptionState = {
-  status: "none" | "pending" | "active" | "expired";
-  plan: PlanId;
-  /** True only when paid, current, and the shop is approved. */
-  active: boolean;
-  expiresAt: string | null;
-  /** Days left, when active. Null otherwise. */
-  daysLeft: number | null;
-};
-
-export function subscriptionState(shop: {
-  subscription_status?: string | null;
-  subscription_expires_at?: string | null;
-  plan?: string | null;
-  status?: string | null;
-  verified?: boolean | null;
-} | null): SubscriptionState {
-  const status = (shop?.subscription_status ?? "none") as SubscriptionState["status"];
-  const plan = (shop?.plan === "premium" ? "premium" : "basic") as PlanId;
-  const expiresAt = shop?.subscription_expires_at ?? null;
-
-  const notLapsed = !expiresAt || new Date(expiresAt).getTime() > Date.now();
-  const approved = shop?.status === "approved" && shop?.verified === true;
-
-  const active = status === "active" && notLapsed && approved;
-
-  const daysLeft = expiresAt
-    ? Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000))
-    : null;
-
-  return { status, plan, active, expiresAt, daysLeft };
-}
-
-/**
- * The path a seller should be sent to when a feature is locked.
- *
- * A seller with no subscription goes to the plan comparison; one whose
- * subscription lapsed goes to renew; a Basic seller goes to upgrade. All
- * three land on the same page, but the query string lets it open on the
- * right tab with the right message.
- */
-export function upgradePath(state: SubscriptionState): string {
-  if (state.status === "expired") return "/seller/subscription?renew=1";
-  if (state.status === "pending") return "/seller/subscription?pending=1";
-  if (state.status === "active" && state.plan === "basic") {
-    return "/seller/subscription?upgrade=1";
-  }
-  return "/seller/subscription";
-}
+/* `subscriptionState`, `isPremiumSeller` and `upgradePath` are re-exported
+ * at the top of this file from `plan-rules.ts`. They are pure functions and
+ * must stay there: the storefront renders the Premium badge from a client
+ * component, and a `server-only` import would break that build. */

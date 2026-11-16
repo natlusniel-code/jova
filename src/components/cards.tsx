@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { naira, cn, discountPercent } from "@/lib/utils";
-import { Star, VerifiedBadge } from "@/components/ui";
+import { Star, VerifiedBadge, PremiumBadge } from "@/components/ui";
+// From `plan-rules`, not `plan-gate`: this file is pulled into the client
+// bundle by the AI search bar, and `plan-gate` carries `server-only`.
+import { isPremiumSeller } from "@/lib/plan-rules";
 import { WishlistButton } from "@/components/wishlist-button";
 import { TrackedListingLink } from "@/components/tracked-listing-link";
 import type { Listing, ShopLite } from "@/lib/queries";
@@ -141,6 +144,7 @@ export function ShopCard({ s }: { s: ShopLite }) {
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-1">
           {s.verified && <VerifiedBadge />}
+          {isPremiumSeller(s) && <PremiumBadge />}
           {place && (
             <span className="inline-flex items-center gap-0.5 text-[11px] text-ink-400">
               <PinIcon className="h-2.5 w-2.5" />

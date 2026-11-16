@@ -7,29 +7,21 @@ import { cn } from "@/lib/utils";
 
 type Role = "buyer" | "seller";
 
-const ROLES: { key: Role; title: string; body: string; icon: React.ReactNode }[] = [
+const ROLES: { key: Role; emoji: string; title: string; body: string }[] = [
   {
     key: "buyer",
+    // The original sign-up icons, restored. They were replaced with custom
+    // line-art SVGs during the auth rework; the brief asks for the first
+    // design's icons back, and these are exactly them.
+    emoji: "🛒",
     title: "I'm here to buy",
     body: "Shop goods or book a service from verified sellers near you.",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M6 7h12l-1.2 12.2a2 2 0 0 1-2 1.8H9.2a2 2 0 0 1-2-1.8L6 7Z" />
-        <path d="M9 7V5.5a3 3 0 0 1 6 0V7" />
-      </svg>
-    ),
   },
   {
     key: "seller",
+    emoji: "🏪",
     title: "I'm here to sell",
     body: "Open a shop, list products or offer your skills.",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3.5 9.5 5 4.5h14l1.5 5" />
-        <path d="M3.5 9.5a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0" />
-        <path d="M5 12v7.5h14V12" />
-      </svg>
-    ),
   },
 ];
 
@@ -117,11 +109,12 @@ export function SignupPanel({
             >
               <span
                 className={cn(
-                  "grid h-8 w-8 place-items-center rounded-xl",
-                  active ? "bg-brand-500 text-white" : "bg-slate-100 text-ink-500",
+                  "grid h-8 w-8 place-items-center rounded-xl text-[17px] leading-none",
+                  active ? "bg-brand-500" : "bg-slate-100",
                 )}
+                aria-hidden="true"
               >
-                {c.icon}
+                {c.emoji}
               </span>
               <p className="mt-2 text-[14.5px] font-bold leading-snug text-ink-900">
                 {c.title}
@@ -153,20 +146,27 @@ export function SignupPanel({
           Nothing Google-related is shown until `role` is set, which is what
           the brief asks for. */}
       {role ? (
-        <div className="mt-5 space-y-3">
-          <GoogleSignInButton
-            mode="signup"
-            role={role}
-            next={next}
-            label={
-              role === "seller"
-                ? "Continue with Google to open a shop"
-                : "Continue with Google to start buying"
-            }
-          />
-          <p className="text-center text-[11.5px] leading-relaxed text-ink-400">
-            We&apos;ll use your Google name and email. Nothing is posted to Google.
-          </p>
+        <div className="mt-5">
+          <div className="relative overflow-hidden rounded-2xl border border-white/60 bg-white/60 p-4 shadow-[0_8px_32px_-8px_rgba(15,23,42,0.22)] backdrop-blur-xl backdrop-saturate-150">
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/70 via-white/10 to-white/0" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
+            <div className="relative">
+              <GoogleSignInButton
+                mode="signup"
+                role={role}
+                next={next}
+                label={
+                  role === "seller"
+                    ? "Continue with Google to open a shop"
+                    : "Continue with Google to start buying"
+                }
+                className="!bg-white/85 hover:!bg-white !text-ink-900 !shadow-none border !border-slate-200/80 backdrop-blur"
+              />
+              <p className="mt-3.5 text-center text-[11.5px] leading-relaxed text-ink-500">
+                We&apos;ll use your Google name and email. Nothing is posted to Google.
+              </p>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="mt-5 rounded-xl border border-dashed border-[var(--line)] bg-slate-50/60 px-4 py-3">

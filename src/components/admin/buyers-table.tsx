@@ -1,28 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { setBuyerBanned } from "@/app/admin-fuckliving/actions";
-import { Badge, Avatar } from "@/components/ui";
+import { Avatar } from "@/components/ui";
+import { ModerationControls } from "@/components/admin/moderation-controls";
 import { shortDate } from "@/lib/utils";
 
+/**
+ * The buyers table.
+ *
+ * The moderation column used to be a single "Ban" toggle that wrote
+ * `profiles.is_banned` directly. It is now the shared
+ * `ModerationControls`, which offers suspend / ban / reactivate and goes
+ * through `admin_moderate_user` — so a buyer can be suspended (temporary)
+ * as well as banned (permanent), and either can be undone.
+ */
 export function BuyersTable({ buyers }: { buyers: any[] }) {
-  const router = useRouter();
-  const [busy, setBusy] = useState("");
-  const [err, setErr] = useState("");
-
-  async function toggleBan(id: string, banned: boolean) {
-    setBusy(id);
-    setErr("");
-    const result = await setBuyerBanned(id, !banned);
-    setBusy("");
-    if (!result.ok) { setErr(result.error ?? "Could not save."); return; }
-    router.refresh();
-  }
-
   return (
     <div className="overflow-x-auto">
-      {err && <p className="px-4 pt-2 text-[11px] font-medium text-red-600">{err}</p>}
       <table className="w-full text-left text-[12px]">
         <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-ink-400">
           <tr>
@@ -51,16 +44,12 @@ export function BuyersTable({ buyers }: { buyers: any[] }) {
               <td className="px-2 py-2 text-ink-600">{b.orderCount}</td>
               <td className="px-2 py-2 text-ink-500">{shortDate(b.created_at)}</td>
               <td className="px-4 py-2">
-                <div className="flex items-center gap-2">
-                  {b.is_banned && <Badge tone="red">banned</Badge>}
-                  <button
-                    onClick={() => toggleBan(b.id, b.is_banned)}
-                    disabled={busy === b.id}
-                    className={`text-[11.5px] font-semibold ${b.is_banned ? "text-brand-600" : "text-red-600"}`}
-                  >
-                    {busy === b.id ? "…" : b.is_banned ? "Unban" : "Ban"}
-                  </button>
-                </div>
+                <ModerationControls
+                  userId={b.id}
+                  name={b.full_name || "this buyer"}
+                  status={b.moderation_status ?? (b.is_banned ? "banned" : "active")}
+                  reason={b.moderation_reason}
+                />
               </td>
             </tr>
           ))}

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient, uploadToBucket } from "@/lib/supabase/client";
+import { createClient, uploadToBucket, currentUserId, updateOne } from "@/lib/supabase/client";
 import { NIGERIA_STATES, lgasFor } from "@/lib/utils";
 import { Avatar, Spinner, Alert, Card } from "@/components/ui";
 
@@ -16,15 +16,20 @@ export function AvatarEditor({ avatarUrl, name }: { avatarUrl: string | null; na
     setBusy(true);
     setErr("");
     try {
+      // Resolve the user BEFORE uploading. The old order uploaded the file
+      // first and only then discovered there was no session, which left an
+      // orphaned object in the bucket and a bare TypeError on screen.
+      const me = await currentUserId();
+      if (!me.ok) throw new Error(me.error);
+
       const publicUrl = await uploadToBucket(file, "avatars");
-      const supabase = createClient();
-      const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", u.user!.id);
-      if (error) throw new Error(error.message);
+      const saved = await updateOne("profiles", { avatar_url: publicUrl }, { id: me.id });
+      if (!saved.ok) throw new Error(saved.error);
+
       setUrl(publicUrl);
       router.refresh();
     } catch (e: any) {
-      setErr(e.message);
+      setErr(e?.message ?? "Could not save your photo.");
     }
     setBusy(false);
   }
@@ -64,19 +69,43 @@ export function ProfileForm({
     e.preventDefault();
     setBusy(true);
     setErr("");
-    const supabase = createClient();
-    const { data: u } = await supabase.auth.getUser();
-    const { error } = await supabase
-      .from("profiles")
-      .update({
+    setOk(false);
+
+    // ── What was wrong here ────────────────────────────────────────────
+    // This read `u.user!.id` and then called `.update(...).eq(...)` with no
+    // `.select()`. Two silent failures in one:
+    //
+    //   * if the session had not hydrated, `u.user` was null and the `!`
+    //     threw a TypeError inside an async handler — the button stayed on
+    //     "Saving…" forever with no message;
+    //   * if RLS filtered the row, the update wrote nothing and still
+    //     returned `error: null`, so the form said "Saved." and the old
+    //     values came back on the next refresh.
+    //
+    // `currentUserId` and `updateOne` turn both into a visible message.
+    const me = await currentUserId();
+    if (!me.ok) {
+      setBusy(false);
+      setErr(me.error);
+      return;
+    }
+
+    const saved = await updateOne(
+      "profiles",
+      {
         full_name: form.full_name.trim(),
         phone: form.phone.trim(),
         state: form.state,
         city: form.city,
-      })
-      .eq("id", u.user!.id);
+      },
+      { id: me.id },
+    );
+
     setBusy(false);
-    if (error) { setErr(error.message); return; }
+    if (!saved.ok) {
+      setErr(saved.error);
+      return;
+    }
     setOk(true);
     router.refresh();
   }

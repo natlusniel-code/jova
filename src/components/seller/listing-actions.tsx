@@ -9,23 +9,51 @@ import { Spinner } from "@/components/ui";
 export function ListingRowActions({ id, status, title }: { id: string; status: string; title: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
   const [confirmDel, setConfirmDel] = useState(false);
 
+  /**
+   * ── Why every write here now checks its result ────────────────────────
+   * These three actions all used to fire and forget:
+   *
+   *     await supabase.from("listings").update({ status }).eq("id", id);
+   *     router.refresh();
+   *
+   * A PostgREST UPDATE that RLS filters out returns `error: null` and
+   * writes nothing, so "Pause" on a listing the seller no longer owns
+   * looked like it worked and then reverted on refresh. The same for
+   * delete. `.select("id")` makes the database return the rows it actually
+   * touched, so zero rows becomes a message instead of a silent no-op.
+   */
   async function patch(nextStatus: string) {
     setBusy(nextStatus);
+    setErr("");
     const supabase = createClient();
-    await supabase.from("listings").update({ status: nextStatus }).eq("id", id);
+    const { data, error } = await supabase
+      .from("listings")
+      .update({ status: nextStatus })
+      .eq("id", id)
+      .select("id");
     setBusy("");
+    if (error) { setErr(error.message); return; }
+    if (!data || data.length === 0) {
+      setErr("That change was not saved. The listing may have been removed.");
+      return;
+    }
     router.refresh();
   }
 
   async function duplicate() {
     setBusy("duplicate");
+    setErr("");
     const supabase = createClient();
     const { data } = await supabase.from("listings").select("*").eq("id", id).single();
     if (data) {
       const { id: _drop, created_at, updated_at, views, ...rest } = data as any;
-      await supabase.from("listings").insert({ ...rest, title: `${rest.title} (copy)`, status: "draft" });
+      const { error } = await supabase
+        .from("listings")
+        .insert({ ...rest, title: `${rest.title} (copy)`, status: "draft" });
+      if (error) { setBusy(""); setErr(error.message); return; }
     }
     setBusy("");
     router.refresh();
@@ -33,10 +61,20 @@ export function ListingRowActions({ id, status, title }: { id: string; status: s
 
   async function remove() {
     setBusy("delete");
+    setErr("");
     const supabase = createClient();
-    await supabase.from("listings").delete().eq("id", id);
+    const { data, error } = await supabase
+      .from("listings")
+      .delete()
+      .eq("id", id)
+      .select("id");
     setBusy("");
     setConfirmDel(false);
+    if (error) { setErr(error.message); return; }
+    if (!data || data.length === 0) {
+      setErr("That listing was not deleted. It may already be gone.");
+      return;
+    }
     router.refresh();
   }
 
@@ -70,6 +108,7 @@ export function ListingRowActions({ id, status, title }: { id: string; status: s
         </button>
       )}
       <button onClick={() => setConfirmDel(true)} className="ml-auto text-red-500 hover:text-red-700">Delete</button>
+      {err && <p className="w-full text-[10.5px] font-medium text-red-600">{err}</p>}
     </div>
   );
 }

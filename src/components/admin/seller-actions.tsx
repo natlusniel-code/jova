@@ -71,24 +71,80 @@ export function SellerDecision({ shopId }: { shopId: string }) {
   );
 }
 
+/**
+ * Suspend / reactivate a SHOP (not the seller's account).
+ *
+ * ── The bug this fixes ────────────────────────────────────────────────
+ * This used to call `toggleShopSuspend(shopId, suspended)` where
+ * `suspended` was `status === 'suspended'` — the shop's CURRENT state —
+ * and the action wrote `suspended ? 'suspended' : 'approved'`. So on a
+ * suspended shop the button passed `true` and wrote 'suspended' again:
+ * "Reactivate" could never reactivate, and it reported success.
+ *
+ * It now names the transition it wants, and a suspension carries a reason
+ * the seller can read (the RPC requires one).
+ */
 export function SellerSuspend({ shopId, status }: { shopId: string; status: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [note, setNote] = useState("");
   const suspended = status === "suspended";
 
-  async function toggle() {
+  async function run(action: "suspend" | "reactivate", why?: string) {
     setBusy(true);
-    const result = await toggleShopSuspend(shopId, suspended);
+    setErr("");
+    const result = await toggleShopSuspend(shopId, action, why);
     setBusy(false);
     if (!result.ok) { setErr(result.error ?? "Could not save."); return; }
-    setErr("");
+    setAsking(false);
+    setNote("");
     router.refresh();
+  }
+
+  if (asking) {
+    return (
+      <div className="w-56 rounded-xl border border-[var(--line)] bg-slate-50 p-2.5 text-left">
+        <p className="text-[11.5px] font-bold text-ink-900">Suspend this shop?</p>
+        <p className="mt-0.5 text-[10.5px] leading-relaxed text-ink-500">
+          Their listings come down immediately. The seller receives this reason.
+        </p>
+        <textarea
+          rows={2}
+          autoFocus
+          className="nm-input mt-1.5 resize-none !py-1.5 !text-[11.5px]"
+          placeholder="e.g. Repeated late deliveries"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+        {err && <p className="mt-1 text-[10.5px] font-medium text-red-600">{err}</p>}
+        <div className="mt-1.5 flex gap-1.5">
+          <button
+            onClick={() => run("suspend", note)}
+            disabled={busy}
+            className="flex-1 rounded-lg bg-red-600 px-2 py-1.5 text-[11px] font-semibold text-white"
+          >
+            {busy ? "…" : "Suspend"}
+          </button>
+          <button
+            onClick={() => { setAsking(false); setErr(""); setNote(""); }}
+            className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-ink-600"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="text-right">
-      <button onClick={toggle} disabled={busy} className={`text-[11.5px] font-semibold ${suspended ? "text-brand-600" : "text-red-600"}`}>
+      <button
+        onClick={() => (suspended ? run("reactivate") : setAsking(true))}
+        disabled={busy}
+        className={`text-[11.5px] font-semibold ${suspended ? "text-brand-600" : "text-red-600"}`}
+      >
         {busy ? "…" : suspended ? "Reactivate" : "Suspend"}
       </button>
       {err && <p className="mt-0.5 text-[10.5px] font-medium text-red-600">{err}</p>}
