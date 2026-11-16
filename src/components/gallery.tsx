@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { BlurredFrame } from "@/components/blurred-frame";
-import { PRODUCT_FRAME_ASPECT, PRODUCT_FRAME_FIT } from "@/lib/image-frame";
+import {
+  PRODUCT_FRAME_ASPECT,
+  PRODUCT_FRAME_FIT,
+  productFrameRatio,
+} from "@/lib/image-frame";
 
 /**
  * The listing image gallery.
@@ -10,9 +14,9 @@ import { PRODUCT_FRAME_ASPECT, PRODUCT_FRAME_FIT } from "@/lib/image-frame";
  * ── One frame, every photo ────────────────────────────────────────────────
  * The frame's width comes from its column and its height from
  * `aspect-ratio`, so a 4000x600 panorama and a 600x4000 portrait both land in
- * exactly the same box. The file's pixel size never influences the layout —
- * that was the original bug, where one wide upload widened the whole document
- * and pushed the sticky header's icons off-screen.
+ * a landscape box. The file's pixel size never widens the document — that was
+ * the original bug, where one wide upload widened the whole document and
+ * pushed the sticky header's icons off-screen.
  *
  * ── Service photos ────────────────────────────────────────────────────────
  * A gig is shown through `BlurredFrame`: the artwork is never cropped, and
@@ -21,10 +25,9 @@ import { PRODUCT_FRAME_ASPECT, PRODUCT_FRAME_FIT } from "@/lib/image-frame";
  *
  * A product photo stays in the plain frame, but it is fitted with
  * `object-contain` rather than cropped: the buyer must see the whole photo the
- * seller uploaded, not a centre crop of it. The frame itself is the SAME
- * square the seller sees while uploading (see `@/lib/image-frame`), at every
- * breakpoint — it used to widen to 4:3 from `md` up, which made the buyer's
- * preview a different shape from the upload tile.
+ * seller uploaded, not a centre crop of it. The frame itself is landscape and
+ * takes the photo's own ratio (see `@/lib/image-frame`), so the photo fills it
+ * with no empty space around it.
  */
 export function Gallery({
   images,
@@ -39,8 +42,13 @@ export function Gallery({
   const [active, setActive] = useState(0);
   const list = images.length ? images : [];
 
-  // A product uses the seller's own upload frame — one square, no breakpoint
-  // variant. A service keeps its wide 16:10 frame (see BlurredFrame).
+  // The product frame takes the seller's photo's own landscape ratio, so the
+  // photo fills it with no empty space around it. `null` until the photo has
+  // loaded, in which case the fallback landscape class is used.
+  const [photoRatio, setPhotoRatio] = useState<number | null>(null);
+
+  // A product uses the seller's own upload frame — landscape, sized to the
+  // photo itself. A service keeps its wide 16:10 frame (see BlurredFrame).
   const frameRatio = natural ? "aspect-[16/10]" : PRODUCT_FRAME_ASPECT;
 
   if (!list.length) {
@@ -65,6 +73,9 @@ export function Gallery({
       ) : (
         <div
           className={`w-full max-w-full overflow-hidden rounded-2xl border border-[var(--line)] bg-slate-100 ${frameRatio}`}
+          style={
+            !natural && photoRatio ? { aspectRatio: String(photoRatio) } : undefined
+          }
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -72,6 +83,10 @@ export function Gallery({
             alt={title}
             loading="eager"
             decoding="async"
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              setPhotoRatio(productFrameRatio(img.naturalWidth, img.naturalHeight));
+            }}
             className={`block h-full w-full max-h-full max-w-full ${PRODUCT_FRAME_FIT}`}
           />
         </div>
@@ -82,7 +97,10 @@ export function Gallery({
           {list.map((src, i) => (
             <button
               key={i}
-              onClick={() => setActive(i)}
+              onClick={() => {
+                setPhotoRatio(null);
+                setActive(i);
+              }}
               className={`shrink-0 overflow-hidden rounded-xl border-2 transition ${
                 natural ? "h-14 w-24" : "h-16 w-16"
               } ${i === active ? "border-brand-500" : "border-transparent opacity-70 hover:opacity-100"}`}
