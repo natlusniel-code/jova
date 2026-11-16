@@ -37,7 +37,7 @@ body {
      a cosmetic cost; a page that will not scroll is not. */
 }
 
-/* ── Scroll performance ────────────────────────────────────────────────────
+/* ── Scroll performance ────────────────────────────────────────────────
    The sticky header, the bottom tab bar and the sticky buy bar are all
    `position: sticky/fixed` and sit over scrolling content. Anything that
    makes the compositor re-blur or re-rasterise them on every frame shows up
@@ -101,6 +101,19 @@ body {
   }
   .nm-scroll::-webkit-scrollbar {
     display: none;
+  }
+  /* The buyer's product photo frame: a small green glass outline.
+     A hairline brand-green border, a soft white sheen along the top edge (the
+     "glass" highlight) and a low green glow just outside it. Deliberately
+     thin and low-opacity so it reads as an outline around the photo, not as a
+     card competing with the listing's own surfaces. */
+  .nm-photo-glass {
+    border-color: rgba(11, 138, 62, 0.45);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      inset 0 0 0 1px rgba(11, 138, 62, 0.08),
+      0 0 0 1px rgba(11, 138, 62, 0.08),
+      0 0 16px -3px rgba(11, 138, 62, 0.4);
   }
 }
 @keyframes nm-shimmer {
