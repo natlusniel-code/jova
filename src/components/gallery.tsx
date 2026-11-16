@@ -11,14 +11,14 @@ import {
 /**
  * The listing image gallery.
  *
- * ── One frame, every photo ────────────────────────────────────────────────
+ * ── One frame, every photo ────────────────────────────────────────────
  * The frame's width comes from its column and its height from
  * `aspect-ratio`, so a 4000x600 panorama and a 600x4000 portrait both land in
  * a landscape box. The file's pixel size never widens the document — that was
  * the original bug, where one wide upload widened the whole document and
  * pushed the sticky header's icons off-screen.
  *
- * ── Service photos ────────────────────────────────────────────────────────
+ * ── Service photos ────────────────────────────────────────────────────
  * A gig is shown through `BlurredFrame`: the artwork is never cropped, and
  * the space it does not fill is covered by a blurred copy of itself instead
  * of flat bars or a repeating tile. See that component for why.
@@ -27,7 +27,8 @@ import {
  * `object-contain` rather than cropped: the buyer must see the whole photo the
  * seller uploaded, not a centre crop of it. The frame itself is landscape and
  * takes the photo's own ratio (see `@/lib/image-frame`), so the photo fills it
- * with no empty space around it.
+ * with no empty space around it. The frame carries a small green glass
+ * outline (`.nm-photo-glass`) so it reads as a deliberate surface.
  */
 export function Gallery({
   images,
@@ -72,7 +73,7 @@ export function Gallery({
         />
       ) : (
         <div
-          className={`w-full max-w-full overflow-hidden rounded-2xl border border-[var(--line)] bg-slate-100 ${frameRatio}`}
+          className={`nm-photo-glass w-full max-w-full overflow-hidden rounded-2xl border border-[var(--line)] bg-slate-100 ${frameRatio}`}
           style={
             !natural && photoRatio ? { aspectRatio: String(photoRatio) } : undefined
           }
