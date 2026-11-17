@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/supabase/server";
 import { getNotifications } from "@/lib/queries";
 import { relTime, cn } from "@/lib/utils";
-import { EmptyState, Badge } from "@/components/ui";
+import { EmptyState, Badge, PageHead } from "@/components/ui";
 import { PushOptIn } from "@/components/push-opt-in";
 import { MarkAllRead } from "@/components/mark-all-read";
 
@@ -57,20 +57,18 @@ export default async function NotificationsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-extrabold tracking-tight text-ink-900">Notifications</h1>
-          <p className="mt-0.5 text-[13px] text-ink-500">
-            {rows.length === 0
-              ? "Order updates and announcements appear here."
-              : unread > 0
-                ? `${unread} unread`
-                : "You're all caught up."}
-          </p>
-        </div>
-        {unread > 0 && <MarkAllRead />}
-      </div>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <PageHead
+        title="Notifications"
+        sub={
+          rows.length === 0
+            ? "Order updates and announcements appear here."
+            : unread > 0
+              ? `${unread} unread`
+              : "You're all caught up."
+        }
+        action={unread > 0 ? <MarkAllRead /> : undefined}
+      />
 
       <PushOptIn />
 
@@ -87,14 +85,14 @@ export default async function NotificationsPage() {
           {groups.map((g) => (
             <section key={g.label}>
               <h2 className="mb-2 text-[12px] font-bold uppercase tracking-wide text-ink-400">{g.label}</h2>
-              <div className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)] bg-white">
+              <div className="divide-y divide-[var(--line)] overflow-hidden rounded-[20px] border border-[var(--line)] bg-white shadow-card">
                 {g.items.map((r) => {
                   const inner = (
                     <div className="flex items-start gap-3">
                       <span
                         className={cn(
                           "mt-1.5 h-2 w-2 shrink-0 rounded-full",
-                          r.read_at ? "bg-slate-200" : "bg-brand-500",
+                          r.read_at ? "bg-[#e2ded5]" : "bg-brand-500",
                         )}
                       />
                       <div className="min-w-0 flex-1">
@@ -110,11 +108,11 @@ export default async function NotificationsPage() {
                     </div>
                   );
                   return r.href ? (
-                    <Link key={r.id} href={r.href} className="block px-4 py-3 transition hover:bg-slate-50">
+                    <Link key={r.id} href={r.href} className="block px-5 py-4 transition hover:bg-[var(--surface-2)]">
                       {inner}
                     </Link>
                   ) : (
-                    <div key={r.id} className="px-4 py-3">
+                    <div key={r.id} className="px-5 py-4">
                       {inner}
                     </div>
                   );

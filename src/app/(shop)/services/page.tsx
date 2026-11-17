@@ -11,7 +11,7 @@ import {
 import { GigCard } from "@/components/gig-card";
 import { Pager } from "@/components/pager";
 import { LocationFilter } from "@/components/location-filter";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, PageHead } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -64,18 +64,16 @@ export default async function ServicesPage({ searchParams }: { searchParams: SP 
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-extrabold tracking-tight text-ink-900">Service Gig</h1>
-          <p className="mt-0.5 text-[13px] text-ink-500">
-            Book a pro — online gigs work anywhere in Nigeria
-          </p>
-        </div>
-        <Link href="/" className="mt-1 shrink-0 text-[13px] font-semibold text-brand-600 hover:text-brand-700">
-          ← Products
-        </Link>
-      </div>
+    <div className="space-y-6">
+      <PageHead
+        title="Services & gigs"
+        sub="Book a pro — online gigs work anywhere in Nigeria, home visits are local."
+        action={
+          <Link href="/" className="nm-btn-ghost nm-btn-sm">
+            ← Products
+          </Link>
+        }
+      />
 
       <LocationFilter
         places={places}
@@ -99,7 +97,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: SP 
         </Link>
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-[var(--line)] pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] pt-4">
         <p className="text-[13px] font-semibold text-ink-700">
           {total} {total === 1 ? "gig" : "gigs"} in {browsingAll ? "all cities" : city}
           {mode === "online" && <span className="font-normal text-ink-400"> · online only</span>}
@@ -129,7 +127,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: SP 
       ) : (
         <>
           {/* One gig per row on a phone, matching the layout sketch. */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {services.map((l) => (
               <GigCard key={l.id} l={l} saved={saved.has(l.id)} signedIn={!!session} />
             ))}
