@@ -4,7 +4,7 @@ import { getSession, createClient } from "@/lib/supabase/server";
 import { getListing, getShopReviews, getShopListings, getGigPackages, getGigReviews, getReviewableGigOrder } from "@/lib/queries";
 import { naira, cn, discountPercent } from "@/lib/utils";
 import { Star, VerifiedBadge, Avatar, Badge, Alert } from "@/components/ui";
-import { AddToCartBar } from "@/components/add-to-cart-bar";
+import { BuyBoxProvider, VariantPicker, BuyActions } from "@/components/buy-box";
 import { ChatWithSeller } from "@/components/chat-with-seller";
 import { ChatPill } from "@/components/chat-pill";
 import { ListingCard } from "@/components/cards";
@@ -77,6 +77,7 @@ export default async function ListingPage({ params }: { params: { id: string } }
     // gig page 408px wide inside a 328px column — the page then overflowed and
     // the browser zoomed out to fit it. `minmax(0,1fr)` removes the floor, and
     // `min-w-0` on the children stops either column re-introducing it.
+    <BuyBoxProvider sizes={l.sizes ?? null} colors={l.colors ?? null}>
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.15fr_1fr]">
       {/* left column */}
       <div className="min-w-0 space-y-4">
@@ -344,8 +345,8 @@ export default async function ListingPage({ params }: { params: { id: string } }
             the right column carries only the product buy box. */}
         {!isService && inStock && (
           <div className="hidden lg:block">
-            <AddToCartBar
-              listing={{ id: l.id, title: l.title, price: Number(l.price), original_price: l.original_price, images: l.images ?? [], type: l.type, fulfilment_mode: l.fulfilment_mode ?? "both", sizes: l.sizes ?? null, colors: l.colors ?? null }}
+            <BuyActions
+              listing={{ id: l.id, title: l.title, price: Number(l.price), original_price: l.original_price, images: l.images ?? [], type: l.type, fulfilment_mode: l.fulfilment_mode ?? "both" }}
               shop={{
                 id: shop.id, slug: shop.slug, name: shop.name, logo_url: shop.logo_url,
                 city: shop.city, state: shop.state, delivery_fee: Number(shop.delivery_fee),
@@ -355,7 +356,6 @@ export default async function ListingPage({ params }: { params: { id: string } }
                 shop_lat: shop.shop_lat ?? null,
                 shop_lng: shop.shop_lng ?? null,
               }}
-              signedIn={!!session}
             />
           </div>
         )}
@@ -371,8 +371,9 @@ export default async function ListingPage({ params }: { params: { id: string } }
       {/* mobile buy bar */}
       {!isService && inStock && (
         <div className="lg:hidden">
-          <AddToCartBar
-            listing={{ id: l.id, title: l.title, price: Number(l.price), original_price: l.original_price, images: l.images ?? [], type: l.type, fulfilment_mode: l.fulfilment_mode ?? "both", sizes: l.sizes ?? null, colors: l.colors ?? null }}
+          <BuyActions
+            variant="sticky"
+            listing={{ id: l.id, title: l.title, price: Number(l.price), original_price: l.original_price, images: l.images ?? [], type: l.type, fulfilment_mode: l.fulfilment_mode ?? "both" }}
             shop={{
               id: shop.id, slug: shop.slug, name: shop.name, logo_url: shop.logo_url,
               city: shop.city, state: shop.state, delivery_fee: Number(shop.delivery_fee),
@@ -382,7 +383,6 @@ export default async function ListingPage({ params }: { params: { id: string } }
               shop_lat: shop.shop_lat ?? null,
               shop_lng: shop.shop_lng ?? null,
             }}
-            signedIn={!!session}
           />
         </div>
       )}
@@ -411,6 +411,7 @@ export default async function ListingPage({ params }: { params: { id: string } }
         </>
       )}
     </div>
+    </BuyBoxProvider>
   );
 }
 
@@ -487,6 +488,13 @@ function PriceBlock({ l, shop }: { l: any; shop: any }) {
         )}
         {shop.verified && <><span className="text-ink-300">•</span><VerifiedBadge /></>}
       </div>
+
+      {/* Size and colour sit directly under the price, where the buyer is
+          already looking — not down in the sticky bar a screen away. The
+          picker renders nothing at all when the listing offers neither. */}
+      {!isService && (
+        <VariantPicker variant="bare" className="mt-3.5 border-t border-[var(--line)] pt-3.5" />
+      )}
     </div>
   );
 }
