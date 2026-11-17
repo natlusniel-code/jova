@@ -69,10 +69,12 @@ export function useChatPresence({
   const [otherTyping, setOtherTyping] = useState(false);
 
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
+  /** The app-wide presence channel, used only to broadcast typing to the list. */
+  const listChannelRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSent = useRef(0);
 
-  /* ── The channel: presence + typing ─────────────────────────────── */
+  /* ── The channel: presence + typing ────────────────────────────────── */
   useEffect(() => {
     const supabase = createClient();
     const ch = supabase.channel(`chat-live-${chatId}`, {
@@ -119,7 +121,26 @@ export function useChatPresence({
     };
   }, [chatId, meId, otherId]);
 
-  /* ── The seller's heartbeat, for the buyer's headline ───────────── */
+  /* ── The app-wide presence channel ───────────────────────────────────
+     Joined here as well as in the list, so a buyer who is IN a thread
+     still reads as online on everyone else's list, and so typing can be
+     broadcast to the list. It is the same channel name the list uses, so
+     Supabase multiplexes it into one socket. */
+  useEffect(() => {
+    const supabase = createClient();
+    const ch = supabase.channel("nm-presence", {
+      config: { broadcast: { self: false }, presence: { key: meId } },
+    });
+    ch.subscribe((status) => {
+      if (status === "SUBSCRIBED") void ch.track({ user_id: meId, at: Date.now() });
+    });
+    listChannelRef.current = ch;
+    return () => {
+      listChannelRef.current = null;
+      supabase.removeChannel(ch);
+    };
+  }, [meId]);
+
   useEffect(() => {
     // A seller does not poll themselves: their own heartbeat is what the
     // column holds, and their view of the buyer comes from presence.
@@ -152,7 +173,15 @@ export function useChatPresence({
       event: "typing",
       payload: { from: meId },
     });
-  }, [meId]);
+    // Also tell the app-wide presence channel, so the CHAT LIST can show
+    // "typing…" on this row while the buyer is still on the list. The
+    // thread channel only reaches people inside this thread.
+    void listChannelRef.current?.send({
+      type: "broadcast",
+      event: "typing",
+      payload: { from: meId, chat_id: chatId },
+    });
+  }, [meId, chatId]);
 
   const stopTyping = useCallback(() => {
     lastTypingSent.current = 0;
@@ -161,7 +190,12 @@ export function useChatPresence({
       event: "stop-typing",
       payload: { from: meId },
     });
-  }, [meId]);
+    void listChannelRef.current?.send({
+      type: "broadcast",
+      event: "stop-typing",
+      payload: { from: meId, chat_id: chatId },
+    });
+  }, [meId, chatId]);
 
   const clearOtherTyping = useCallback(() => {
     if (typingTimer.current) clearTimeout(typingTimer.current);
