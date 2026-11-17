@@ -11,6 +11,33 @@ import { PRODUCT_FRAME_FIT, PRODUCT_TILE_SIZE } from "@/lib/image-frame";
 /** The three gig tiers, matching the `gig_packages.tier` check constraint. */
 type PlanTier = "basic" | "standard" | "premium";
 
+/**
+ * Split a comma-separated variant field into a clean list, or null.
+ *
+ * "S, M, L, , s" → ["S", "M", "L"] — trimmed, blanks dropped, and
+ * case-insensitive duplicates removed while keeping the seller's own
+ * capitalisation and order. Returns null (not []) when nothing is left,
+ * so the column stores NULL and the storefront's "has options?" test is a
+ * single truthiness check.
+ *
+ * The database has the same rule in `clean_variant_list` (sql/0049); this
+ * is the client-side copy so the chips under the field match what will be
+ * saved.
+ */
+function splitVariants(raw: string): string[] | null {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of raw.split(",")) {
+    const v = part.trim();
+    if (!v) continue;
+    const k = v.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(v);
+  }
+  return out.length ? out : null;
+}
+
 /** One tier's draft, as typed into the create form. */
 type PlanDraft = {
   name: string;
@@ -90,6 +117,11 @@ export function ListingForm({
     needs_home_visit: listing?.needs_home_visit ?? false,
     delivery_days: listing?.delivery_days != null ? String(listing.delivery_days) : "",
     fulfilment_mode: (listing?.fulfilment_mode ?? "both") as "both" | "pickup" | "delivery",
+    // Variants (sql/0049). Held as comma-separated text in the form and
+    // split on save, because a seller types "S, M, L" far faster than
+    // they would add three chips one at a time.
+    sizes: (listing?.sizes ?? []).join(", "),
+    colors: (listing?.colors ?? []).join(", "),
   });
   const [images, setImages] = useState<string[]>(listing?.images ?? []);
   const [tags, setTags] = useState<string[]>(listing?.tags ?? []);
@@ -262,6 +294,11 @@ export function ListingForm({
       // 'both' (the column default) rather than a value that would imply
       // a courier. A product keeps whatever the seller chose.
       fulfilment_mode: type === "product" ? form.fulfilment_mode : "both",
+      // Variants (sql/0049). Only a product can have them, and an empty
+      // list is stored as null rather than an empty array so the
+      // storefront's "has options?" check is a single truthiness test.
+      sizes: type === "product" ? splitVariants(form.sizes) : null,
+      colors: type === "product" ? splitVariants(form.colors) : null,
       status,
     };
 
@@ -269,14 +306,40 @@ export function ListingForm({
       ? await supabase.from("listings").update(payload).eq("id", listing.id).select("id")
       : await supabase.from("listings").insert(payload).select("id");
 
+    // ── A database that has not run sql/0049 yet ────────────────────────
+    // `sizes` and `colors` are new columns. On a deployment where the
+    // migration has not been applied, PostgREST rejects the whole write
+    // with "column listings.sizes does not exist" — which would stop a
+    // seller from saving ANY listing, including one with no variants at
+    // all. That is not an acceptable failure for an optional feature.
+    //
+    // So the write is retried once without the two fields, and the seller
+    // is told plainly that the options were not saved and why. The listing
+    // itself still saves, which is the important part.
+    let variantWarning = "";
+    let result = { data, error };
+    if (error && /sizes|colors/i.test(error.message) && /column|schema/i.test(error.message)) {
+      const { sizes: _s, colors: _c, ...withoutVariants } = payload;
+      result = editing
+        ? await supabase.from("listings").update(withoutVariants).eq("id", listing.id).select("id")
+        : await supabase.from("listings").insert(withoutVariants).select("id");
+      if (!result.error) {
+        variantWarning =
+          "Saved — but the size and colour options were not stored: the database is missing the variants migration (sql/0049). Run it, then add the options again.";
+      }
+    }
+    const finalData = result.data;
+    const finalError = result.error;
+
     setBusy("");
-    if (error) { setErr(error.message); return; }
-    // ── Why the row count is checked ───────────────────────────────────
+    if (finalError) { setErr(finalError.message); return; }
+    if (variantWarning) setErr(variantWarning);
+    // ── Why the row count is checked ────────────────────────────────────
     // An UPDATE that RLS filters out returns `error: null` and writes
     // nothing. Without this check the seller was sent to /seller/listings
     // as if the edit had saved, and the old values were still there. The
     // `.select("id")` above makes the database report what it wrote.
-    if (!data || data.length === 0) {
+    if (!finalData || finalData.length === 0) {
       setErr(
         editing
           ? "That listing was not saved. It may have been removed, or your shop is not active."
@@ -285,7 +348,7 @@ export function ListingForm({
       return;
     }
 
-    // ── Write the gig plans, now that the gig has an id ────────────────
+    // ── Write the gig plans, now that the gig has an id ─────────────────
     // `gig_packages.listing_id` is a foreign key, so this cannot be part
     // of the insert above. Only a NEW service listing reaches here with
     // plans to write: an existing gig edits them on the edit page.
@@ -297,7 +360,7 @@ export function ListingForm({
     // advertising a starting price with no tiers behind it.
     const rows = type === "service" && !editing ? planRows() : [];
     if (rows.length > 0) {
-      const listingId = (data[0] as { id: string }).id;
+      const listingId = (finalData[0] as { id: string }).id;
       const { error: planError } = await supabase.from("gig_packages").insert(
         rows.map((r) => ({ ...r, listing_id: listingId })),
       );
@@ -474,11 +537,64 @@ export function ListingForm({
           </div>
 
           {type === "product" ? (
-            <div>
-              <label className="nm-label">Stock</label>
-              <input className="nm-input" inputMode="numeric" value={form.stock}
-                onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value.replace(/\D/g, "") }))} />
-              <p className="mt-1 text-[11px] text-ink-400">At 5 or fewer we show a low-stock warning on your dashboard.</p>
+            <div className="space-y-3">
+              <div>
+                <label className="nm-label">Stock</label>
+                <input className="nm-input" inputMode="numeric" value={form.stock}
+                  onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value.replace(/\D/g, "") }))} />
+                <p className="mt-1 text-[11px] text-ink-400">At 5 or fewer we show a low-stock warning on your dashboard.</p>
+              </div>
+
+              {/* ── Size and colour (sql/0049) ──────────────────────────
+                  Both optional. A seller who does not sell clothing leaves
+                  them blank and the storefront shows no picker at all. */}
+              <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
+                <p className="text-[12.5px] font-bold text-ink-800">Sizes and colours</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-ink-500">
+                  Optional. Add the options you actually stock, separated by commas — a buyer
+                  picks one of each at checkout. Leave blank if the product has none.
+                </p>
+
+                <div className="mt-2.5 space-y-2.5">
+                  <div>
+                    <label className="nm-label">Sizes</label>
+                    <input
+                      className="nm-input"
+                      placeholder="e.g. S, M, L, XL"
+                      value={form.sizes}
+                      onChange={(e) => setForm((f) => ({ ...f, sizes: e.target.value }))}
+                    />
+                    {splitVariants(form.sizes)?.length ? (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {splitVariants(form.sizes)!.map((s) => (
+                          <span key={s} className="rounded-md bg-white px-1.5 py-0.5 text-[10.5px] font-semibold text-ink-600 ring-1 ring-[var(--line)]">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <label className="nm-label">Colours</label>
+                    <input
+                      className="nm-input"
+                      placeholder="e.g. Black, White, Navy"
+                      value={form.colors}
+                      onChange={(e) => setForm((f) => ({ ...f, colors: e.target.value }))}
+                    />
+                    {splitVariants(form.colors)?.length ? (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {splitVariants(form.colors)!.map((c) => (
+                          <span key={c} className="rounded-md bg-white px-1.5 py-0.5 text-[10.5px] font-semibold text-ink-600 ring-1 ring-[var(--line)]">
+                            {c}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="space-y-2.5">
