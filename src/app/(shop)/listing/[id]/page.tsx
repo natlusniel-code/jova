@@ -340,25 +340,10 @@ export default async function ListingPage({ params }: { params: { id: string } }
           )}
         </div>
 
-        {/* buy box / quote box.
-            A gig's plan now lives in the left column under Description, so
-            the right column carries only the product buy box. */}
-        {!isService && inStock && (
-          <div className="hidden lg:block">
-            <BuyActions
-              listing={{ id: l.id, title: l.title, price: Number(l.price), original_price: l.original_price, images: l.images ?? [], type: l.type, fulfilment_mode: l.fulfilment_mode ?? "both" }}
-              shop={{
-                id: shop.id, slug: shop.slug, name: shop.name, logo_url: shop.logo_url,
-                city: shop.city, state: shop.state, delivery_fee: Number(shop.delivery_fee),
-                free_delivery_threshold: shop.free_delivery_threshold ? Number(shop.free_delivery_threshold) : null,
-                pickup_available: shop.pickup_available,
-                shop_address: shop.shop_address ?? null,
-                shop_lat: shop.shop_lat ?? null,
-                shop_lng: shop.shop_lng ?? null,
-              }}
-            />
-          </div>
-        )}
+        {/* The buy box is no longer a separate card here: quantity, Add to
+            cart and Buy now live inside PriceBlock, directly under the price
+            and the size/colour picker. PriceBlock is rendered once per
+            breakpoint, so both columns get the actions in the same place. */}
         {!isService && !inStock && (
           <Alert tone="amber" title="Out of stock">This item is sold out. Chat with the seller to ask when it will be back.</Alert>
         )}
@@ -368,24 +353,10 @@ export default async function ListingPage({ params }: { params: { id: string } }
         </div>
       </div>
 
-      {/* mobile buy bar */}
-      {!isService && inStock && (
-        <div className="lg:hidden">
-          <BuyActions
-            variant="sticky"
-            listing={{ id: l.id, title: l.title, price: Number(l.price), original_price: l.original_price, images: l.images ?? [], type: l.type, fulfilment_mode: l.fulfilment_mode ?? "both" }}
-            shop={{
-              id: shop.id, slug: shop.slug, name: shop.name, logo_url: shop.logo_url,
-              city: shop.city, state: shop.state, delivery_fee: Number(shop.delivery_fee),
-              free_delivery_threshold: shop.free_delivery_threshold ? Number(shop.free_delivery_threshold) : null,
-              pickup_available: shop.pickup_available,
-              shop_address: shop.shop_address ?? null,
-              shop_lat: shop.shop_lat ?? null,
-              shop_lng: shop.shop_lng ?? null,
-            }}
-          />
-        </div>
-      )}
+      {/* No pinned mobile buy bar any more: PriceBlock renders above the
+          description on phones and now carries the quantity stepper and both
+          buttons, so the action sits with the price instead of floating over
+          the page. */}
 
       {more.filter((m) => m.id !== l.id).length > 0 && (
         <section className="lg:col-span-2">
@@ -490,10 +461,45 @@ function PriceBlock({ l, shop }: { l: any; shop: any }) {
       </div>
 
       {/* Size and colour sit directly under the price, where the buyer is
-          already looking — not down in the sticky bar a screen away. The
-          picker renders nothing at all when the listing offers neither. */}
+          already looking. The picker renders nothing at all when the listing
+          offers neither. */}
       {!isService && (
         <VariantPicker variant="bare" className="mt-3.5 border-t border-[var(--line)] pt-3.5" />
+      )}
+
+      {/* Quantity, Add to cart and Buy now follow the picker into the same
+          card, so the whole decision — price, variant, quantity, action —
+          reads top to bottom in one place instead of being split between
+          this card and a bar pinned to the bottom of the screen. */}
+      {!isService && Number(l.stock) > 0 && (
+        <div className="mt-3.5 border-t border-[var(--line)] pt-3.5">
+          <BuyActions
+            variant="bare"
+            listing={{
+              id: l.id,
+              title: l.title,
+              price: Number(l.price),
+              original_price: l.original_price,
+              images: l.images ?? [],
+              type: l.type,
+              fulfilment_mode: l.fulfilment_mode ?? "both",
+            }}
+            shop={{
+              id: shop.id,
+              slug: shop.slug,
+              name: shop.name,
+              logo_url: shop.logo_url,
+              city: shop.city,
+              state: shop.state,
+              delivery_fee: Number(shop.delivery_fee),
+              free_delivery_threshold: shop.free_delivery_threshold ? Number(shop.free_delivery_threshold) : null,
+              pickup_available: shop.pickup_available,
+              shop_address: shop.shop_address ?? null,
+              shop_lat: shop.shop_lat ?? null,
+              shop_lng: shop.shop_lng ?? null,
+            }}
+          />
+        </div>
       )}
     </div>
   );
