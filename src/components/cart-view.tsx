@@ -132,7 +132,7 @@ function ShopGroup({ shop }: { shop: CartShop }) {
 
       <div className="divide-y divide-[var(--line)]">
         {shop.lines.map((l) => (
-          <div key={l.listingId} className="flex gap-3 px-4 py-3">
+          <div key={`${l.listingId}::${l.packageTier ?? ""}::${l.size ?? ""}::${l.color ?? ""}`} className="flex gap-3 px-4 py-3">
             <Link href={`/listing/${l.listingId}`} className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-slate-100">
               {l.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -143,6 +143,14 @@ function ShopGroup({ shop }: { shop: CartShop }) {
             </Link>
             <div className="min-w-0 flex-1">
               <p className="line-clamp-2 text-[13px] font-semibold leading-snug text-ink-900">{l.title}</p>
+              {/* The chosen variant, so two sizes of one product are
+                  distinguishable in the basket. Absent for a product with
+                  no options, which is most of them. */}
+              {(l.size || l.color) && (
+                <p className="mt-0.5 text-[11.5px] font-medium text-ink-500">
+                  {[l.size && `Size ${l.size}`, l.color].filter(Boolean).join(" · ")}
+                </p>
+              )}
               <p className="mt-0.5 flex flex-wrap items-baseline gap-1.5 text-[13px] font-bold text-ink-900">
                 {naira(l.price)}
                 {discountPercent(l.price, l.originalPrice) > 0 && l.originalPrice != null && (
@@ -151,13 +159,13 @@ function ShopGroup({ shop }: { shop: CartShop }) {
               </p>
               <div className="mt-1.5 flex items-center gap-1 rounded-lg border border-[var(--line)] px-1 w-fit">
                 <button
-                  onClick={() => setQuantity(shop.shopId, l.listingId, l.quantity - 1)}
+                  onClick={() => setQuantity(shop.shopId, l.listingId, l.quantity - 1, { size: l.size, color: l.color })}
                   className="grid h-7 w-7 place-items-center rounded text-ink-600 hover:bg-slate-50"
                   aria-label="Decrease"
                 >−</button>
                 <span className="w-5 text-center text-[12.5px] font-bold">{l.quantity}</span>
                 <button
-                  onClick={() => setQuantity(shop.shopId, l.listingId, l.quantity + 1)}
+                  onClick={() => setQuantity(shop.shopId, l.listingId, l.quantity + 1, { size: l.size, color: l.color })}
                   className="grid h-7 w-7 place-items-center rounded text-ink-600 hover:bg-slate-50"
                   aria-label="Increase"
                 >+</button>
