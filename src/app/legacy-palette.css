@@ -1,0 +1,60 @@
+/* =====================================================================
+   Legacy palette bridge
+   ---------------------------------------------------------------------
+   The app was built on Tailwind's cool greys (slate/gray) and on a few
+   stock accent colours. Rather than rewrite every one of the ~85 files
+   that use them — a mechanical change that would bury the real redesign
+   in noise — the handful of utilities that actually appear are remapped
+   here onto the warm palette.
+
+   This file is imported AFTER globals.css in the root layout, so these
+   rules win on cascade order without needing `!important`. They are
+   intentionally narrow: only the exact shades the codebase uses are
+   listed, so a new `bg-slate-700` would still fall through to Tailwind's
+   own colour and be obvious in review rather than silently remapped.
+   ===================================================================== */
+
+/* ── Cool greys → warm neutrals ─────────────────────────────────────── */
+.bg-slate-50, .bg-gray-50 { background-color: var(--surface-2); }
+.bg-slate-100, .bg-gray-100 { background-color: var(--surface-3); }
+.bg-slate-200, .bg-gray-200 { background-color: #e9e6df; }
+
+.text-slate-300, .text-gray-300 { color: var(--faint); }
+.text-slate-400, .text-gray-400 { color: var(--faint); }
+.text-slate-500, .text-gray-500 { color: var(--muted); }
+.text-slate-600, .text-gray-600 { color: var(--ink-2); }
+.text-slate-700, .text-gray-700 { color: var(--ink-2); }
+.text-slate-800, .text-gray-800 { color: var(--ink); }
+.text-slate-900, .text-gray-900 { color: var(--ink); }
+
+.border-slate-100, .border-gray-100 { border-color: var(--line-2); }
+.border-slate-200, .border-gray-200 { border-color: var(--line); }
+.border-slate-300, .border-gray-300 { border-color: #d8d4cb; }
+
+.divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: var(--line-2); }
+.divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+.divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--line); }
+
+/* ── Stock accents → the system's own ───────────────────────────────── */
+.text-red-500, .text-red-600 { color: #b23a1b; }
+.bg-red-50 { background-color: #fff4f0; }
+.bg-red-500, .bg-red-600 { background-color: #c2410c; }
+.border-red-200 { border-color: #f7c9b8; }
+
+.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900 { color: #7a4f08; }
+.bg-amber-50 { background-color: #fdf7ec; }
+.bg-amber-100 { background-color: #fbeed3; }
+.border-amber-200, .border-amber-300 { border-color: #f2d9a8; }
+
+.text-emerald-600, .text-emerald-700 { color: var(--brand); }
+.bg-emerald-50 { background-color: var(--brand-tint); }
+.bg-emerald-100 { background-color: var(--brand-soft); }
+
+.text-green-600, .text-green-700 { color: var(--brand); }
+.bg-green-50 { background-color: var(--brand-tint); }
+.bg-green-100 { background-color: var(--brand-soft); }
+
+/* ── Radii: the old 2xl/3xl steps → the system's ────────────────────── */
+.rounded-2xl { border-radius: var(--r-lg); }
+.rounded-3xl { border-radius: var(--r-xl); }
