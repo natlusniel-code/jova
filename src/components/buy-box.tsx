@@ -7,20 +7,15 @@ import { naira, cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui";
 
 /**
- * The buy box, split in two.
+ * The buy box.
  *
- * ── Why it is split ────────────────────────────────────────────────────────
- * The size and colour pickers used to live inside the sticky action bar at
- * the bottom of the screen, which put the choice a full screen away from the
- * price it changes. The reference layout puts them directly under the price,
- * where the buyer is already looking, and leaves only quantity and the two
- * buttons in the bar.
- *
- * Splitting them means the picker and the buttons are two separate pieces of
- * DOM in two different places on the page, so the selection has to live above
- * both of them. That is what `BuyBoxProvider` is for: one piece of state,
- * read by the picker under the price and by the buttons in the bar, so
- * tapping "15 inches" up top immediately enables "Add to cart" down below.
+ * ── One card, top to bottom ────────────────────────────────────────────────
+ * Price, size/colour, quantity and the two buttons all live in the same card
+ * on the listing page. The picker and the buttons are still two separate
+ * pieces of DOM, so the selection has to live above both of them. That is
+ * what `BuyBoxProvider` is for: one piece of state, read by the picker under
+ * the price and by the buttons below it, so tapping "15 inches" immediately
+ * enables "Add to cart".
  *
  * ── Size and colour are optional ───────────────────────────────────────────
  * A listing with no sizes renders no size row at all — not an empty heading.
@@ -176,13 +171,15 @@ export function VariantPicker({
 /**
  * Quantity, Add to cart and Buy now.
  *
- * `variant="sticky"` is the phone bar pinned above the tab bar; `"inline"` is
- * the desktop card in the right column. Both read the same selection.
+ * `variant="bare"` is the default: it sits inside the price card, directly
+ * under the size/colour picker, so the whole decision reads top to bottom in
+ * one place. `"inline"` is a standalone card and `"sticky"` the pinned phone
+ * bar — both kept for other surfaces that still want them.
  */
 export function BuyActions({
   listing,
   shop,
-  variant = "inline",
+  variant = "bare",
 }: {
   listing: {
     id: string;
@@ -207,7 +204,7 @@ export function BuyActions({
     shop_lat?: number | null;
     shop_lng?: number | null;
   };
-  variant?: "sticky" | "inline";
+  variant?: "sticky" | "inline" | "bare";
 }) {
   const router = useRouter();
   const { size, color, qty, setQty, missing, ready } = useBuyBox();
@@ -254,7 +251,9 @@ export function BuyActions({
       className={cn(
         variant === "sticky"
           ? "nm-sticky-chrome sticky bottom-[78px] z-30 -mx-4 border-t border-[var(--line)] bg-white px-4 py-3"
-          : "nm-card p-4",
+          : variant === "inline"
+            ? "nm-card p-4"
+            : "",
       )}
     >
       <div className="flex items-center gap-3">
