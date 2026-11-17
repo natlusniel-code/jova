@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card } from "@/components/ui";
+import { Card, PageHead } from "@/components/ui";
 import { SupportLink } from "@/components/support-link";
 import { SUPPORT_WHATSAPP_DISPLAY, supportWhatsAppUrl } from "@/lib/support";
 
@@ -30,15 +30,13 @@ const FAQ = [
 
 export default function HelpPage() {
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <div>
-        <h1 className="text-[24px] font-extrabold tracking-tight text-ink-900">Help &amp; support</h1>
-        <p className="mt-1 text-[13.5px] text-ink-500">
-          We answer on WhatsApp — usually within a few minutes during business hours.
-        </p>
-      </div>
+    <div className="mx-auto max-w-2xl space-y-5">
+      <PageHead
+        title="Help & support"
+        sub="We answer on WhatsApp — usually within a few minutes during business hours."
+      />
 
-      <Card className="p-4">
+      <Card className="p-5">
         <p className="text-[13.5px] font-bold text-ink-900">Talk to a human</p>
         <p className="mt-1 text-[12.5px] leading-relaxed text-ink-500">
           Message us on WhatsApp at <strong className="text-ink-700">{SUPPORT_WHATSAPP_DISPLAY}</strong>. Include your
@@ -49,23 +47,23 @@ export default function HelpPage() {
             href={supportWhatsAppUrl("Hi NaijaMart support, I need help with...")}
             target="_blank"
             rel="noreferrer noopener"
-            className="nm-btn-primary !px-4 !py-2.5 !text-[13px]"
+            className="nm-btn-primary nm-btn-sm"
           >
             Chat on WhatsApp
           </a>
-          <Link href="/orders" className="nm-btn-ghost !px-4 !py-2.5 !text-[13px]">
+          <Link href="/orders" className="nm-btn-ghost nm-btn-sm">
             My orders
           </Link>
         </div>
       </Card>
 
-      <Card className="p-4">
+      <Card className="p-5">
         <p className="text-[13.5px] font-bold text-ink-900">Common questions</p>
-        <dl className="mt-3 space-y-3.5">
+        <dl className="mt-4 space-y-4">
           {FAQ.map((item) => (
             <div key={item.q}>
               <dt className="text-[13px] font-semibold text-ink-900">{item.q}</dt>
-              <dd className="mt-0.5 text-[12.5px] leading-relaxed text-ink-500">{item.a}</dd>
+              <dd className="mt-1 text-[12.5px] leading-relaxed text-ink-500">{item.a}</dd>
             </div>
           ))}
         </dl>

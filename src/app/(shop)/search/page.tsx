@@ -5,7 +5,7 @@ import { ListingCard } from "@/components/cards";
 import { GigCard } from "@/components/gig-card";
 import { LocationFilter } from "@/components/location-filter";
 import { AiSearchBar } from "@/components/ai-search-bar";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, PageHead } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -59,15 +59,24 @@ export default async function SearchPage({ searchParams }: { searchParams: SP })
   const activeCatName = cats.find((c: { slug: string }) => c.slug === activeCat)?.name ?? null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/*
-        ── The search bar ────────────────────────────────────────────
+        ── The search bar ────────────────────────────────────────────────
         The AI bar replaces the plain form. It is a superset: typing still
         does a normal search (it posts to /api/ai/search, which runs the
         same `searchListings` the form used to), and voice and photo are
         added beside it. The `action="/search"` form is gone because a
         voice/photo result cannot be expressed as a GET query string.
       */}
+      <PageHead
+        title={searchParams.q ? `Results for “${searchParams.q}”` : "Browse the market"}
+        sub={
+          browsingAll
+            ? "Every live listing, from every city."
+            : `Live listings in ${city} — switch city below to widen the search.`
+        }
+      />
+
       <AiSearchBar initialQuery={searchParams.q ?? ""} />
 
       {/* location filter */}
@@ -132,7 +141,7 @@ export default async function SearchPage({ searchParams }: { searchParams: SP })
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-[var(--line)] pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] pt-4">
         <p className="text-[13px] font-semibold text-ink-700">
           {results.length} {results.length === 1 ? "item" : "items"} in {browsingAll ? "all cities" : city}
           {activeCatName && <span className="font-normal text-ink-400"> in {activeCatName}</span>}
@@ -165,7 +174,7 @@ export default async function SearchPage({ searchParams }: { searchParams: SP })
           href={activeCatName || browsingAll ? "/search" : `/search?city=${ALL_CITIES}`}
         />
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
           {results.map((l) =>
             l.type === "service" ? (
               <GigCard key={l.id} l={l} saved={saved.has(l.id)} signedIn={!!session} />

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession, createClient } from "@/lib/supabase/server";
 import { naira, shortDate } from "@/lib/utils";
-import { Avatar, Badge, Card } from "@/components/ui";
+import { Avatar, Badge, Card, PageHead } from "@/components/ui";
 import { ProfileForm, AvatarEditor } from "@/components/profile-form";
 import { SignOutButton } from "@/components/sign-out-button";
 import { InstallAppRow } from "@/components/install-app-row";
@@ -29,10 +29,10 @@ export default async function ProfilePage() {
   const p = session.profile;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <h1 className="text-[22px] font-extrabold tracking-tight text-ink-900">Your profile</h1>
+    <div className="mx-auto max-w-3xl space-y-5">
+      <PageHead title="Your profile" sub="Your details, addresses, receipts and account settings." />
 
-      <Card className="p-4">
+      <Card className="p-5">
         <div className="flex items-center gap-4">
           <AvatarEditor avatarUrl={p.avatar_url} name={p.full_name} />
           <div className="min-w-0">
@@ -55,15 +55,15 @@ export default async function ProfilePage() {
         }}
       />
 
-      <Card className="p-4">
+      <Card className="p-5">
         <div className="flex items-center justify-between">
           <p className="text-[14px] font-bold text-ink-900">Saved addresses</p>
           <Link href="/profile/location" className="text-[12.5px] font-semibold text-brand-600">Manage</Link>
         </div>
         {addresses?.length ? (
-          <ul className="mt-2 space-y-2">
+          <ul className="mt-3 space-y-2">
             {addresses.map((a: any) => (
-              <li key={a.id} className="rounded-xl border border-[var(--line)] px-3 py-2">
+              <li key={a.id} className="rounded-[13px] border border-[var(--line)] bg-[var(--surface-2)] px-3.5 py-2.5">
                 <p className="text-[12.5px] font-semibold text-ink-900">
                   {a.label} {a.is_default && <Badge tone="green" className="ml-1">default</Badge>}
                 </p>
@@ -76,15 +76,15 @@ export default async function ProfilePage() {
         )}
       </Card>
 
-      <Card className="p-4">
+      <Card className="p-5">
         <div className="flex items-center justify-between">
           <p className="text-[14px] font-bold text-ink-900">Payment receipts</p>
           <Link href="/orders" className="text-[12.5px] font-semibold text-brand-600">All orders ({orderCount ?? 0})</Link>
         </div>
         {receipts?.length ? (
-          <ul className="mt-2 divide-y divide-[var(--line)]">
+          <ul className="mt-3 divide-y divide-[var(--line)]">
             {receipts.map((r: any) => (
-              <li key={r.id} className="flex items-center justify-between gap-2 py-2">
+              <li key={r.id} className="flex items-center justify-between gap-2 py-2.5">
                 <div className="min-w-0">
                   <p className="font-mono text-[11.5px] text-ink-500">{r.reference}</p>
                   <p className="text-[12px] text-ink-400">{shortDate(r.created_at)}</p>
@@ -107,7 +107,7 @@ export default async function ProfilePage() {
 
       <Card className="divide-y divide-[var(--line)] overflow-hidden">
         {!session.shop && (
-          <Link href="/seller/onboarding" className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
+          <Link href="/seller/onboarding" className="flex items-center justify-between px-5 py-4 transition hover:bg-[var(--surface-2)]">
             <div>
               <p className="text-[13.5px] font-semibold text-ink-900">Become a seller</p>
               <p className="text-[11.5px] text-ink-500">List products or offer services, free to start</p>
@@ -116,12 +116,12 @@ export default async function ProfilePage() {
           </Link>
         )}
         {session.shop && (
-          <Link href="/seller" className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
+          <Link href="/seller" className="flex items-center justify-between px-5 py-4 transition hover:bg-[var(--surface-2)]">
             <p className="text-[13.5px] font-semibold text-ink-900">Seller hub</p>
             <span className="text-ink-400">→</span>
           </Link>
         )}
-        <Link href="/wishlist" className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
+        <Link href="/wishlist" className="flex items-center justify-between px-5 py-4 transition hover:bg-[var(--surface-2)]">
           <p className="text-[13.5px] font-semibold text-ink-900">Wishlist</p>
           <span className="text-ink-400">→</span>
         </Link>
@@ -129,7 +129,7 @@ export default async function ProfilePage() {
             orders. It sits in settings because that is where a shopper looks
             for help with their account; the Help page keeps the human
             WhatsApp route for anything the assistant cannot settle. */}
-        <Link href="/profile/support" className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
+        <Link href="/profile/support" className="flex items-center justify-between px-5 py-4 transition hover:bg-[var(--surface-2)]">
           <div>
             <p className="text-[13.5px] font-semibold text-ink-900">Ask Support</p>
             <p className="text-[11.5px] text-ink-500">Ask about your orders, delivery or payments</p>
@@ -139,14 +139,14 @@ export default async function ProfilePage() {
         {/* Renders only when the app is NOT installed — a user who already has
             it sees no "Install app" row at all. See install-app-row.tsx. */}
         <InstallAppRow />
-        <Link href="/legal/terms" className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
+        <Link href="/legal/terms" className="flex items-center justify-between px-5 py-4 transition hover:bg-[var(--surface-2)]">
           <p className="text-[13.5px] font-semibold text-ink-900">Terms &amp; policies</p>
           <span className="text-ink-400">→</span>
         </Link>
         {/* This used to read "Order updates by email are always on", which was
             not true — nothing sends email. It now points at the real
             notification settings. */}
-        <Link href="/notifications" className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
+        <Link href="/notifications" className="flex items-center justify-between px-5 py-4 transition hover:bg-[var(--surface-2)]">
           <div>
             <p className="text-[13.5px] font-semibold text-ink-900">Notifications</p>
             <p className="text-[11.5px] text-ink-500">Order updates in the app, and on your phone if you allow it</p>

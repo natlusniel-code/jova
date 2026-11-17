@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/supabase/server";
 import { getMyOrders } from "@/lib/queries";
 import { naira, shortDate, ORDER_STATUS, cn } from "@/lib/utils";
-import { Badge, EmptyState, Tabs, Alert } from "@/components/ui";
+import { Badge, EmptyState, Tabs, Alert, PageHead } from "@/components/ui";
 import { UploadReceipt, ConfirmDelivery, LeaveReview } from "@/components/order-actions";
 
 export const dynamic = "force-dynamic";
@@ -47,8 +47,11 @@ export default async function OrdersPage({
   };
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-[22px] font-extrabold tracking-tight text-ink-900">Your orders</h1>
+    <div className="space-y-6">
+      <PageHead
+        title="Your orders"
+        sub="Every escrow journey in one place — receipt, seller acceptance, delivery and payout."
+      />
 
       {searchParams.placed === "1" && (
         <Alert tone="green" title="Order placed — we're checking your receipt">
@@ -67,13 +70,13 @@ export default async function OrdersPage({
           href="/"
         />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {filtered.map((o: any) => {
             const st = ORDER_STATUS[o.status] ?? { label: o.status, tone: "gray" };
             const items = o.order_items ?? [];
             return (
               <div key={o.id} className="nm-card overflow-hidden">
-                <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-2.5">
+                <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-5 py-3.5">
                   <div className="min-w-0">
                     <Link href={`/shop/${o.shops?.slug}`} className="truncate text-[13px] font-bold text-ink-900 hover:text-brand-600">
                       🏪 {o.shops?.name}
@@ -83,7 +86,7 @@ export default async function OrdersPage({
                   <Badge tone={st.tone as any} dot>{st.label}</Badge>
                 </div>
 
-                <div className="px-4 py-2.5">
+                <div className="px-5 py-3.5">
                   <p className="text-[12.5px] text-ink-600">
                     {items.slice(0, 2).map((i: any) => `${i.title} ×${i.quantity}`).join(", ")}
                     {items.length > 2 && <span className="text-ink-400"> +{items.length - 2} more</span>}
@@ -95,7 +98,7 @@ export default async function OrdersPage({
                 </div>
 
                 {/* the one action that matters right now */}
-                <div className="border-t border-[var(--line)] bg-slate-50/50 px-4 py-2.5">
+                <div className="border-t border-[var(--line)] bg-[var(--surface-2)] px-5 py-3.5">
                   {o.status === "pending_payment" && (
                     <div className="grid gap-2 sm:grid-cols-2">
                       <UploadReceipt orderId={o.id} existingUrl={o.receipt_url} />
@@ -123,7 +126,7 @@ export default async function OrdersPage({
                     </p>
                   )}
                   {o.status === "disputed" && (
-                    <p className="text-[12px] font-medium text-red-700">Support is reviewing this order. We&apos;ll message you.</p>
+                    <p className="text-[12px] font-medium text-[#8f2f14]">Support is reviewing this order. We&apos;ll message you.</p>
                   )}
                 </div>
               </div>
