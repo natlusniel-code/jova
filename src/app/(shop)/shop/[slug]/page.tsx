@@ -11,6 +11,7 @@ import { ListingCard } from "@/components/cards";
 import { FollowButton } from "@/components/follow-button";
 import { ChatPill } from "@/components/chat-pill";
 import { ShopSignInPrompt } from "@/components/shop-signin-prompt";
+import { logoShadow } from "@/lib/logo-shadow";
 
 export const dynamic = "force-dynamic";
 
@@ -120,58 +121,62 @@ export default async function ShopPage({ params }: { params: { slug: string } })
 
   return (
     <div className="-mx-4 md:mx-0">
-      {/* banner */}
-      <div className="relative h-40 w-full overflow-hidden bg-brand-100 md:h-52 md:rounded-2xl">
-        {shop.banner_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={shop.banner_url} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <div className="h-full w-full bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700" />
-        )}
-        {shop.status !== "approved" && (
-          <div className="absolute left-3 top-3">
-            <Badge tone={shop.status === "pending" ? "amber" : "red"}>
-              {shop.status === "pending" ? "Awaiting approval — not public yet" : `Shop ${shop.status}`}
-            </Badge>
-          </div>
-        )}
-      </div>
+      {/* Banner, with the logo sitting ON it — reference 3.
+          The banner is a wide 16:7 panel (the same ratio the seller card
+          uses, so a shop looks the same in the carousel and on its own
+          page), and the logo is absolutely positioned at its bottom-left,
+          overlapping the edge. That is what the reference draws: the mark
+          belongs to the artwork, not to the text block below it.
 
-      {/* identity ────────────────────────────────────────────────────────────
-          The banner sits ABOVE this block and the logo/name sit BELOW it, on
-          their own white surface. The old version pulled this block up with a
-          negative margin so the logo overlapped the banner — but the business
-          name and the rating/location line came with it, landing on top of the
-          banner image. On a dark banner that made the name unreadable, and on
-          a light one it looked like a rendering bug.
+          The logo tile is `object-contain` on white, so a wordmark is
+          never cropped, and its shadow is tinted from the banner (see
+          `logoShadow`) so it reads as part of the image rather than a
+          sticker dropped on top. */}
+      <div className="relative w-full">
+        <div className="relative aspect-[16/7] w-full overflow-hidden bg-brand-100 md:rounded-2xl">
+          {shop.banner_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={shop.banner_url} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="h-full w-full bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700" />
+          )}
 
-          Now nothing overlaps: banner, then a clean card. The logo keeps a
-          white ring so it still reads as a distinct mark rather than a floating
-          square. */}
-      <div className="px-4 pt-3 md:px-4">
-        {/* A slim identity strip.
+          {shop.status !== "approved" && (
+            <div className="absolute left-3 top-3">
+              <Badge tone={shop.status === "pending" ? "amber" : "red"}>
+                {shop.status === "pending" ? "Awaiting approval — not public yet" : `Shop ${shop.status}`}
+              </Badge>
+            </div>
+          )}
+        </div>
 
-            This used to be a large block: a 20x20 wordmark, the name, the
-            stars, the follower count, a description paragraph, a row of
-            category badges, and a full-width "Chat" button beside "Follow".
-            That block repeated what the banner already says and its button row
-            duplicated the pinned chat bar, while the paragraph pushed the
-            first listing below the fold on a phone.
-
-            What is left is the one line a buyer needs to know WHO they are
-            dealing with — mark, name, trust signals, where they are — plus
-            Follow. Chatting is the pinned pill at the bottom, which stays
-            reachable no matter how far the buyer scrolls. */}
-        <div className="flex items-center gap-3">
+        {/* The logo, on the banner.
+            It is a SIBLING of the banner, not a child: the banner clips its
+            own image (`overflow-hidden` for the rounded corners), and a
+            logo inside it would be cut in half by the `translate-y-1/2`
+            that makes it straddle the edge. Sitting outside, it overlaps
+            the banner's bottom edge and is fully visible. */}
+        <span
+          className="absolute bottom-0 left-4 grid h-[68px] w-[68px] translate-y-1/2 place-items-center overflow-hidden rounded-[20px] bg-white shadow-[0_0_0_3px_#fff,0_12px_26px_-8px_var(--nm-logo-shadow,rgba(16,24,24,.45))] sm:h-[76px] sm:w-[76px]"
+          style={{ ["--nm-logo-shadow" as string]: logoShadow(shop.banner_url) }}
+        >
           {shop.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={shop.logo_url} alt={shop.name} className="h-14 w-14 shrink-0 rounded-2xl border-2 border-white bg-white object-cover shadow-card" />
+            <img src={shop.logo_url} alt={shop.name} className="h-full w-full object-contain" />
           ) : (
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border-2 border-white bg-brand-500 text-[17px] font-extrabold text-white shadow-card">
+            <span className="grid h-full w-full place-items-center bg-brand-500 text-[19px] font-extrabold text-white">
               {shop.name.slice(0, 2).toUpperCase()}
             </span>
           )}
+        </span>
+      </div>
 
+      {/* identity ─────────────────────────────────────────────────────────
+          The name and trust signals sit BELOW the banner, clear of the
+          logo's overhang. `pt-11` is the logo's half-height plus a gap, so
+          the name never collides with the mark on any screen width. */}
+      <div className="px-4 pt-11 md:px-4">
+        <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <h1 className="truncate text-[17px] font-extrabold tracking-tight text-ink-900">{shop.name}</h1>
@@ -218,7 +223,7 @@ export default async function ShopPage({ params }: { params: { slug: string } })
       <div className="mt-6 px-4 md:px-4">
         {listings.length === 0 ? (
           <EmptyState
-            icon="🪟"
+            icon="🩯"
             title="This shop is still setting up"
             body={`${shop.name} hasn't published anything yet. Follow the shop or chat to ask what's coming.`}
             action="Browse other sellers"
