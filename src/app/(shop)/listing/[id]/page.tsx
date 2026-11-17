@@ -345,7 +345,7 @@ export default async function ListingPage({ params }: { params: { id: string } }
         {!isService && inStock && (
           <div className="hidden lg:block">
             <AddToCartBar
-              listing={{ id: l.id, title: l.title, price: Number(l.price), original_price: l.original_price, images: l.images ?? [], type: l.type, fulfilment_mode: l.fulfilment_mode ?? "both" }}
+              listing={{ id: l.id, title: l.title, price: Number(l.price), original_price: l.original_price, images: l.images ?? [], type: l.type, fulfilment_mode: l.fulfilment_mode ?? "both", sizes: l.sizes ?? null, colors: l.colors ?? null }}
               shop={{
                 id: shop.id, slug: shop.slug, name: shop.name, logo_url: shop.logo_url,
                 city: shop.city, state: shop.state, delivery_fee: Number(shop.delivery_fee),
@@ -372,7 +372,7 @@ export default async function ListingPage({ params }: { params: { id: string } }
       {!isService && inStock && (
         <div className="lg:hidden">
           <AddToCartBar
-            listing={{ id: l.id, title: l.title, price: Number(l.price), original_price: l.original_price, images: l.images ?? [], type: l.type, fulfilment_mode: l.fulfilment_mode ?? "both" }}
+            listing={{ id: l.id, title: l.title, price: Number(l.price), original_price: l.original_price, images: l.images ?? [], type: l.type, fulfilment_mode: l.fulfilment_mode ?? "both", sizes: l.sizes ?? null, colors: l.colors ?? null }}
             shop={{
               id: shop.id, slug: shop.slug, name: shop.name, logo_url: shop.logo_url,
               city: shop.city, state: shop.state, delivery_fee: Number(shop.delivery_fee),
