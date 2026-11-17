@@ -152,16 +152,11 @@ export function ListingCard({
  * padded body, so a tall logo was clipped by the card's `overflow-hidden`
  * and a wide one was cropped to a square.
  *
- * The logo is absolutely positioned ON the banner, in a fixed 62px tile
- * with `object-contain` and a white background, so the whole mark is
+ * Now the logo is absolutely positioned ON the banner, in a fixed 62px
+ * tile with `object-contain` and a white background, so the whole mark is
  * always visible whatever its aspect ratio. It carries a white ring and a
  * shadow whose colour is derived from the banner (see `logoShadow`), so
  * the mark sits on the banner rather than floating over it.
- *
- * It also lives OUTSIDE the banner element: the banner clips its own
- * rounded corners with `overflow: hidden`, and a logo hanging 26px below
- * that edge would be cut off by it. The wrapper (`.nm-seller-banner-wrap`)
- * is a non-clipping positioning context, so the whole tile renders.
  *
  * ── The banner ──────────────────────────────────────────────────────────
  * 16:7, full width, `object-cover` — a banner is decorative, so cropping
@@ -178,25 +173,21 @@ export function ShopCard({ s, wide = false }: { s: ShopLite; wide?: boolean }) {
         wide ? "w-full" : "w-[186px] shrink-0 sm:w-[212px]",
       )}
     >
-      <div className="nm-seller-banner-wrap">
-        <div className="nm-seller-banner">
-          {s.banner_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={s.banner_url}
-              alt=""
-              className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-              loading="lazy"
-            />
-          ) : (
-            <div className="h-full w-full bg-gradient-to-br from-brand-500 via-brand-600 to-brand-800" />
-          )}
-        </div>
+      <div className="nm-seller-banner">
+        {s.banner_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={s.banner_url}
+            alt=""
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+            loading="lazy"
+          />
+        ) : (
+          <div className="h-full w-full bg-gradient-to-br from-brand-500 via-brand-600 to-brand-800" />
+        )}
 
-        {/* The logo, on the banner. It lives OUTSIDE the banner's
-            overflow-hidden so the part that hangs below the banner edge
-            is never clipped. `logoShadow` tints the drop shadow with the
-            banner's own colour so the mark belongs to the artwork. */}
+        {/* The logo, on the banner. `logoShadow` tints the drop shadow with
+            the banner's own colour so the mark belongs to the artwork. */}
         <span
           className="nm-seller-logo"
           style={{ ["--nm-logo-shadow" as string]: logoShadow(s.banner_url) }}
