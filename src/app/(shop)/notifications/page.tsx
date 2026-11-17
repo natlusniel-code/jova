@@ -2,32 +2,102 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/supabase/server";
 import { getNotifications } from "@/lib/queries";
-import { relTime, cn } from "@/lib/utils";
-import { EmptyState, Badge, PageHead } from "@/components/ui";
+import { relTime } from "@/lib/utils";
+import { EmptyState } from "@/components/ui";
 import { PushOptIn } from "@/components/push-opt-in";
 import { MarkAllRead } from "@/components/mark-all-read";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Notifications" };
 
-const KIND_TONE: Record<string, "blue" | "violet" | "gray" | "green"> = {
-  order: "blue",
-  chat: "green",
-  broadcast: "violet",
-  system: "gray",
-  promo: "violet",
-};
+/**
+ * Notifications — reference 5.
+ *
+ * ── Layout ──────────────────────────────────────────────────────────────
+ * A page title with "Mark all read" on the right, then ONE rounded card
+ * holding every row. Rows alternate mint and white, each with a tinted
+ * icon tile on the left, a bold title, a grey body line and a relative
+ * timestamp. Nothing is grouped into day headings any more: the
+ * reference is a single continuous list, and the timestamp on each row
+ * already says when it happened.
+ *
+ * ── The icons ───────────────────────────────────────────────────────────
+ * The reference uses a different glyph per kind — a parcel for an order,
+ * a speech bubble for a message, a star for a review, a shield for
+ * escrow, a party popper for a welcome. Those are reproduced here as
+ * inline SVG, tinted per kind, so the list reads at a glance without
+ * needing the label.
+ *
+ * ── What is preserved ───────────────────────────────────────────────────
+ * Every row is still a real link when it has an `href`, still marks
+ * itself read on the server, and the push opt-in still sits above the
+ * list. The unread count is still shown, just as a quiet line under the
+ * title rather than a badge.
+ */
+type Kind = "order" | "chat" | "broadcast" | "system" | "promo" | string;
 
-// The label names WHERE the notification came from, so a buyer can tell a
-// message from a person apart from a NaijaMart announcement at a glance.
-// Mirrors NOTIFICATION_SOURCES in src/lib/notification-source.ts.
-const KIND_LABEL: Record<string, string> = {
-  order: "Order update",
-  chat: "Message",
-  broadcast: "NaijaMart",
-  system: "NaijaMart",
-  promo: "NaijaMart offer",
-};
+/** The icon tile for a notification kind. */
+function KindIcon({ kind }: { kind: Kind }) {
+  const common = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  const cls = "h-[19px] w-[19px]";
+
+  switch (kind) {
+    case "order":
+      // A parcel — brown, as the reference draws it.
+      return (
+        <span className="nm-notif-ic text-[#a9713f]">
+          <svg viewBox="0 0 24 24" className={cls} {...common}>
+            <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" />
+            <path d="m4 7.5 8 4.5 8-4.5M12 12v9" />
+          </svg>
+        </span>
+      );
+    case "chat":
+      // A speech bubble — soft violet, as the reference draws it.
+      return (
+        <span className="nm-notif-ic text-[#8b7fd4]">
+          <svg viewBox="0 0 24 24" className={cls} {...common}>
+            <path d="M20.5 12c0 4.1-3.8 7.4-8.5 7.4-1 0-1.9-.15-2.8-.42L4 21l1.3-3.6A7 7 0 0 1 3.5 12C3.5 7.9 7.3 4.6 12 4.6s8.5 3.3 8.5 7.4Z" />
+          </svg>
+        </span>
+      );
+    case "promo":
+      // A star — gold.
+      return (
+        <span className="nm-notif-ic text-[#e0a800]">
+          <svg viewBox="0 0 24 24" className={cls} fill="currentColor" aria-hidden="true">
+            <path d="m12 3.6 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.8l5.9-.9L12 3.6Z" />
+          </svg>
+        </span>
+      );
+    case "broadcast":
+      // A shield — the escrow promise.
+      return (
+        <span className="nm-notif-ic text-[#c0392b]">
+          <svg viewBox="0 0 24 24" className={cls} {...common}>
+            <path d="M12 3 5 6v6c0 4.4 3 7.6 7 9 4-1.4 7-4.6 7-9V6l-7-3Z" />
+            <path d="m9 12 2 2 4-4" />
+          </svg>
+        </span>
+      );
+    default:
+      // A party popper — the welcome.
+      return (
+        <span className="nm-notif-ic text-[#d98324]">
+          <svg viewBox="0 0 24 24" className={cls} {...common}>
+            <path d="M4 20 9.5 8.5 15.5 14.5 4 20Z" />
+            <path d="M14 4.5c.6 1.2 1.8 2.4 3 3M17.5 3c.4.8 1.2 1.6 2 2M19 8.5c.8.4 1.6 1.2 2 2" />
+          </svg>
+        </span>
+      );
+  }
+}
 
 export default async function NotificationsPage() {
   const session = await getSession();
@@ -36,90 +106,81 @@ export default async function NotificationsPage() {
   const rows = await getNotifications(session.user.id);
   const unread = rows.filter((r) => !r.read_at).length;
 
-  // Group by day so a long list stays readable — "Today", "Yesterday", then
-  // the date. A flat reverse-chronological list of 60 rows is hard to scan.
-  const groups: { label: string; items: typeof rows }[] = [];
-  const today = new Date();
-  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-  const startOfYesterday = startOfToday - 86_400_000;
-
-  for (const r of rows) {
-    const t = new Date(r.created_at).getTime();
-    const label =
-      t >= startOfToday
-        ? "Today"
-        : t >= startOfYesterday
-          ? "Yesterday"
-          : new Date(r.created_at).toLocaleDateString("en-NG", { day: "2-digit", month: "long", year: "numeric" });
-    const last = groups[groups.length - 1];
-    if (last && last.label === label) last.items.push(r);
-    else groups.push({ label, items: [r] });
-  }
-
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <PageHead
-        title="Notifications"
-        sub={
-          rows.length === 0
-            ? "Order updates and announcements appear here."
-            : unread > 0
-              ? `${unread} unread`
-              : "You're all caught up."
-        }
-        action={unread > 0 ? <MarkAllRead /> : undefined}
-      />
+    <div className="mx-auto max-w-2xl">
+      {/* ── Head ─────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
+        <div className="min-w-0">
+          <h1 className="text-[26px] font-extrabold tracking-[-0.03em] text-ink-900 sm:text-[30px]">
+            Notifications
+          </h1>
+          {rows.length > 0 && (
+            <p className="mt-1 text-[12.5px] font-medium text-ink-500">
+              {unread > 0 ? `${unread} unread` : "You're all caught up."}
+            </p>
+          )}
+        </div>
+        {unread > 0 && <MarkAllRead />}
+      </div>
 
-      <PushOptIn />
+      <div className="mt-4">
+        <PushOptIn />
+      </div>
 
       {rows.length === 0 ? (
-        <EmptyState
-          icon="🔔"
-          title="No notifications yet"
-          body="When you place an order you'll be told at every step — payment confirmed, accepted, shipped, delivered. Announcements from NaijaMart show up here too."
-          action="Start shopping"
-          href="/"
-        />
+        <div className="mt-4">
+          <EmptyState
+            icon="🔔"
+            title="No notifications yet"
+            body="When you place an order you'll be told at every step — payment confirmed, accepted, shipped, delivered. Announcements from NaijaMart show up here too."
+            action="Start shopping"
+            href="/"
+          />
+        </div>
       ) : (
-        <div className="space-y-4">
-          {groups.map((g) => (
-            <section key={g.label}>
-              <h2 className="mb-2 text-[12px] font-bold uppercase tracking-wide text-ink-400">{g.label}</h2>
-              <div className="divide-y divide-[var(--line)] overflow-hidden rounded-[20px] border border-[var(--line)] bg-white shadow-card">
-                {g.items.map((r) => {
-                  const inner = (
-                    <div className="flex items-start gap-3">
+        /* One card, every row. `overflow-hidden` is what lets the first and
+           last row take the card's radius without their own corners. */
+        <div className="nm-notif-card mt-4 overflow-hidden rounded-[24px] shadow-[0_1px_2px_rgba(16,24,24,.04),0_10px_26px_-16px_rgba(16,24,24,.2)]">
+          {rows.map((r) => {
+            const inner = (
+              <>
+                <KindIcon kind={r.kind} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start gap-2">
+                    <p
+                      className={
+                        r.read_at
+                          ? "text-[14px] font-semibold leading-snug text-ink-800"
+                          : "text-[14px] font-bold leading-snug text-ink-900"
+                      }
+                    >
+                      {r.title}
+                    </p>
+                    {!r.read_at && (
                       <span
-                        className={cn(
-                          "mt-1.5 h-2 w-2 shrink-0 rounded-full",
-                          r.read_at ? "bg-[#e2ded5]" : "bg-brand-500",
-                        )}
+                        className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#0f753c]"
+                        aria-label="Unread"
                       />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className={cn("text-[13.5px] leading-snug", r.read_at ? "font-semibold text-ink-700" : "font-bold text-ink-900")}>
-                            {r.title}
-                          </p>
-                          <Badge tone={KIND_TONE[r.kind] ?? "gray"}>{KIND_LABEL[r.kind] ?? r.kind}</Badge>
-                        </div>
-                        {r.body && <p className="mt-1 text-[12.5px] leading-relaxed text-ink-500">{r.body}</p>}
-                        <p className="mt-1 text-[11px] text-ink-400">{relTime(r.created_at)}</p>
-                      </div>
-                    </div>
-                  );
-                  return r.href ? (
-                    <Link key={r.id} href={r.href} className="block px-5 py-4 transition hover:bg-[var(--surface-2)]">
-                      {inner}
-                    </Link>
-                  ) : (
-                    <div key={r.id} className="px-5 py-4">
-                      {inner}
-                    </div>
-                  );
-                })}
+                    )}
+                  </div>
+                  {r.body && (
+                    <p className="mt-1 text-[12.5px] leading-relaxed text-ink-500">{r.body}</p>
+                  )}
+                  <p className="mt-1.5 text-[11px] font-medium text-ink-400">{relTime(r.created_at)}</p>
+                </div>
+              </>
+            );
+
+            return r.href ? (
+              <Link key={r.id} href={r.href} className="nm-notif-row">
+                {inner}
+              </Link>
+            ) : (
+              <div key={r.id} className="nm-notif-row">
+                {inner}
               </div>
-            </section>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
