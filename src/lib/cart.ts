@@ -48,6 +48,13 @@ export type CartShop = {
      * field existed still parse — an absent value is treated as 'both'.
      */
     fulfilmentMode?: "both" | "pickup" | "delivery";
+    /**
+     * The size the buyer chose (sql/0049). Absent for a product with no
+     * size options, which is the common case.
+     */
+    size?: string | null;
+    /** The colour the buyer chose (sql/0049). Absent for most products. */
+    color?: string | null;
   }[];
 };
 
@@ -96,6 +103,10 @@ export function addToCart(item: {
   packageTier?: "basic" | "standard" | "premium" | null;
   /** The seller's fulfilment choice for this listing (sql/0034). */
   fulfilmentMode?: "both" | "pickup" | "delivery";
+  /** The size the buyer picked (sql/0049). Omit for a product with no sizes. */
+  size?: string | null;
+  /** The colour the buyer picked (sql/0049). Omit for a product with no colours. */
+  color?: string | null;
 }) {
   const cart = readCart();
   const shop =
@@ -120,9 +131,17 @@ export function addToCart(item: {
   // A gig bought at two different tiers is two different lines: Basic and
   // Premium are different products at different prices, so they must not
   // merge into one quantity.
-  const lineKey = (id: string, tier?: string | null) => `${id}::${tier ?? ""}`;
+  //
+  // The same is true of a size and a colour (sql/0049): a Large Black
+  // T-shirt and a Medium Black T-shirt are two different things to pack,
+  // so they are two lines. A product with no options has both as null and
+  // therefore still merges by listing id alone, exactly as before.
+  const lineKey = (id: string, tier?: string | null, size?: string | null, color?: string | null) =>
+    `${id}::${tier ?? ""}::${(size ?? "").toLowerCase()}::${(color ?? "").toLowerCase()}`;
   const existing = shop.lines.find(
-    (l) => lineKey(l.listingId, l.packageTier) === lineKey(item.listingId, item.packageTier),
+    (l) =>
+      lineKey(l.listingId, l.packageTier, l.size, l.color) ===
+      lineKey(item.listingId, item.packageTier, item.size, item.color),
   );
   if (existing) existing.quantity += item.quantity ?? 1;
   else
@@ -136,6 +155,8 @@ export function addToCart(item: {
       isService: item.isService ?? false,
       packageTier: item.packageTier ?? null,
       fulfilmentMode: item.fulfilmentMode ?? "both",
+      size: item.size ?? null,
+      color: item.color ?? null,
     });
 
   // A shop that only allows pickup must not keep a stale 'delivery' choice
@@ -149,13 +170,23 @@ export function addToCart(item: {
   writeCart(cart);
 }
 
-export function setQuantity(shopId: string, listingId: string, quantity: number) {
+export function setQuantity(
+  shopId: string,
+  listingId: string,
+  quantity: number,
+  /** The line's variant, so two sizes of one product are changed separately. */
+  variant?: { size?: string | null; color?: string | null },
+) {
   const cart = readCart();
   const shop = cart[shopId];
   if (!shop) return;
-  if (quantity <= 0) shop.lines = shop.lines.filter((l) => l.listingId !== listingId);
+  const same = (l: (typeof shop.lines)[number]) =>
+    l.listingId === listingId &&
+    (l.size ?? "").toLowerCase() === (variant?.size ?? "").toLowerCase() &&
+    (l.color ?? "").toLowerCase() === (variant?.color ?? "").toLowerCase();
+  if (quantity <= 0) shop.lines = shop.lines.filter((l) => !same(l));
   else {
-    const line = shop.lines.find((l) => l.listingId === listingId);
+    const line = shop.lines.find(same);
     if (line) line.quantity = quantity;
   }
   if (shop.lines.length === 0) delete cart[shopId];
