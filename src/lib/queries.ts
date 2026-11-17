@@ -44,6 +44,14 @@ export type Listing = {
   rating_avg: number;
   rating_count: number;
   delivery_fee_override: number | null;
+  /**
+   * The sizes the seller stocks (sql/0049), e.g. ['S','M','L']. Null or
+   * empty means the product has no size choice and the storefront shows
+   * no size picker at all.
+   */
+  sizes?: string[] | null;
+  /** The colours the seller stocks (sql/0049). Same optionality as sizes. */
+  colors?: string[] | null;
   free_delivery_threshold: number | null;
   /**
    * The seller's fulfilment choice for this listing (sql/0034):
@@ -211,7 +219,7 @@ const SHOP_POOL = 60;
 /**
  * Verified sellers near a city.
  *
- * ── Why the ordering is seeded, not `random()` ─────────────────────────────
+ * ── Why the ordering is seeded, not `random()` ─────────────────────────
  * The storefront shows three verified sellers and the pick must be **random
  * per account but stable for that account**. `ORDER BY random()` (or a
  * `Math.random()` pick) is random per *request*: the home page is a Server
@@ -408,7 +416,42 @@ export async function getListing(id: string) {
     .select(LISTING_COLS)
     .eq("id", id)
     .maybeSingle();
-  return (data ?? null) as unknown as Listing | null;
+  if (!data) return null;
+
+  // ── Variants, read separately and tolerantly ────────────────────────
+  // `sizes` and `colors` arrive with sql/0049. They are NOT in
+  // LISTING_COLS because a database that has not run that migration yet
+  // would reject the whole select — and then every listing page would
+  // 404, which is a far worse failure than a missing size picker.
+  //
+  // So they are fetched on their own: if the columns exist the listing
+  // gets its options, and if they do not the query errors quietly and the
+  // listing simply has none. The storefront behaves identically either
+  // way, which is what "optional" has to mean in practice.
+  const variants = await getListingVariants(id);
+
+  return { ...(data as unknown as Listing), ...variants } as Listing;
+}
+
+/**
+ * The listing's size and colour options, or nulls when the database has
+ * not been migrated yet (sql/0049).
+ *
+ * Deliberately swallows the error: a missing column is an expected state
+ * during a rolling deploy, not something to surface to a buyer.
+ */
+async function getListingVariants(
+  id: string,
+): Promise<{ sizes: string[] | null; colors: string[] | null }> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("listings")
+    .select("sizes,colors")
+    .eq("id", id)
+    .maybeSingle();
+  if (error || !data) return { sizes: null, colors: null };
+  const row = data as { sizes?: string[] | null; colors?: string[] | null };
+  return { sizes: row.sizes ?? null, colors: row.colors ?? null };
 }
 
 export async function getShopBySlug(slug: string) {
