@@ -1,12 +1,45 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
+/* =====================================================================
+   Shared UI primitives
+   ---------------------------------------------------------------------
+   Every surface in the app — storefront, seller hub, admin console —
+   builds from these. They carry the design system's type, radii, spacing
+   and colour so a page never has to invent its own.
+
+   Rule of thumb for this file: no black. The darkest fill is the deep
+   green (`--brand-deep`); `--ink` is for text only.
+   ===================================================================== */
+
 /* ------------------------------------------------------------------ Logo */
-export function Logo({ compact = false, light = false }: { compact?: boolean; light?: boolean }) {
+export function Logo({
+  compact = false,
+  light = false,
+  className,
+}: {
+  compact?: boolean;
+  light?: boolean;
+  className?: string;
+}) {
   return (
-    <Link href="/" className="inline-flex items-center gap-2">
-      <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-500 text-white shadow-sm">
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+    <Link href="/" className={cn("inline-flex items-center gap-2.5", className)}>
+      <span
+        className="grid h-9 w-9 place-items-center rounded-[11px] text-white"
+        style={{
+          background: "linear-gradient(145deg,#0e8c4f,#064e2c)",
+          boxShadow: "0 4px 12px -2px rgba(6,78,44,.45)",
+        }}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          className="h-[19px] w-[19px]"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.1}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M3 7h14l-1.5 9H5.2L3 7Z" />
           <path d="M17 7V5H19" />
           <circle cx="7" cy="19" r="1.4" />
@@ -14,8 +47,13 @@ export function Logo({ compact = false, light = false }: { compact?: boolean; li
         </svg>
       </span>
       {!compact && (
-        <span className={cn("text-[17px] font-extrabold tracking-tight", light ? "text-white" : "text-ink-900")}>
-          Naija<span className="text-brand-500">Mart</span>
+        <span
+          className={cn(
+            "font-display text-[19px] font-extrabold tracking-[-0.04em]",
+            light ? "text-white" : "text-ink-900",
+          )}
+        >
+          Naija<span className={light ? "text-lime" : "text-brand-500"}>Mart</span>
         </span>
       )}
     </Link>
@@ -24,12 +62,12 @@ export function Logo({ compact = false, light = false }: { compact?: boolean; li
 
 /* ------------------------------------------------------------------ Badge */
 const TONES = {
-  green: "bg-brand-50 text-brand-700 ring-brand-500/20",
-  amber: "bg-amber-50 text-amber-700 ring-amber-500/20",
-  blue: "bg-sky-50 text-sky-700 ring-sky-500/20",
-  violet: "bg-violet-50 text-violet-700 ring-violet-500/20",
-  gray: "bg-slate-100 text-slate-600 ring-slate-400/20",
-  red: "bg-red-50 text-red-700 ring-red-500/20",
+  green: "bg-brand-100 text-brand-800",
+  amber: "bg-[#fdf3e1] text-[#8a5a0b]",
+  blue: "bg-[#eaf2fd] text-[#1d4f91]",
+  violet: "bg-[#efedfe] text-[#4b3bc4]",
+  gray: "bg-[#f1efe9] text-[#5a6470]",
+  red: "bg-[#ffede7] text-[#b23a1b]",
 } as const;
 
 export function Badge({
@@ -44,13 +82,7 @@ export function Badge({
   dot?: boolean;
 }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-semibold ring-1 ring-inset",
-        TONES[tone],
-        className,
-      )}
-    >
+    <span className={cn("nm-badge", TONES[tone], className)}>
       {dot && <span className="h-1.5 w-1.5 rounded-full bg-current" />}
       {children}
     </span>
@@ -59,8 +91,13 @@ export function Badge({
 
 export function VerifiedBadge({ className }: { className?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[11.5px] font-semibold text-brand-700", className)}>
-      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor">
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-bold text-brand-800",
+        className,
+      )}
+    >
+      <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor" aria-hidden="true">
         <path d="M12 2 15.1 4.6l4.1.2.2 4.1L22 12l-2.6 3.1-.2 4.1-4.1.2L12 22l-3.1-2.6-4.1-.2-.2-4.1L2 12l2.6-3.1.2-4.1 4.1-.2L12 2Z" opacity=".18" />
         <path d="m10.6 14.6-2.2-2.2 1.1-1.1 1.1 1.1 3.9-3.9 1.1 1.1-5 5Z" />
       </svg>
@@ -88,12 +125,12 @@ export function PremiumBadge({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11.5px] font-semibold text-amber-800",
+        "inline-flex items-center gap-1 rounded-full border border-[#f2d9a8] bg-[#fdf3e1] px-2 py-0.5 text-[11px] font-bold text-[#8a5a0b]",
         className,
       )}
       title="Premium seller"
     >
-      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+      <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor" aria-hidden="true">
         <path d="M12 2.6l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 8.8l5.9-.9L12 2.6Z" />
       </svg>
       Premium
@@ -115,17 +152,23 @@ export function OrderStatusChip({ status }: { status: string }) {
     disputed: { label: "Disputed", tone: "red" },
   };
   const s = map[status] ?? { label: status, tone: "gray" as const };
-  return <Badge tone={s.tone} dot>{s.label}</Badge>;
+  return (
+    <Badge tone={s.tone} dot>
+      {s.label}
+    </Badge>
+  );
 }
 
 export function Star({ value, count, className }: { value: number; count?: number; className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-1", className)}>
-      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-amber-400">
+      <svg viewBox="0 0 24 24" className="h-3 w-3 fill-[#f2a93b]" aria-hidden="true">
         <path d="m12 17.3-6.2 3.7 1.7-7L2 9.2l7.1-.6L12 2l2.9 6.6 7.1.6-5.5 4.8 1.7 7L12 17.3Z" />
       </svg>
-      <span className="text-[12.5px] font-semibold text-ink-700">{value ? value.toFixed(1) : "New"}</span>
-      {typeof count === "number" && count > 0 && <span className="text-[12px] text-ink-400">({count})</span>}
+      <span className="text-[11.5px] font-bold text-ink-700">{value ? value.toFixed(1) : "New"}</span>
+      {typeof count === "number" && count > 0 && (
+        <span className="text-[11px] font-medium text-ink-400">({count})</span>
+      )}
     </span>
   );
 }
@@ -135,7 +178,7 @@ export function Star({ value, count, className }: { value: number; count?: numbe
 /**
  * The placeholder face for a user who has not uploaded a picture.
  *
- * ── Why an icon and not initials ──────────────────────────────────────────
+ * ── Why an icon and not initials ──────────────────────────────────────
  * The old fallback printed the first letters of the person's name ("DA" for
  * "David Adeyemi") on a green disc. Two problems with that: it reads as a
  * designed avatar rather than a missing one, so nobody realises they can add
@@ -146,13 +189,7 @@ export function Star({ value, count, className }: { value: number; count?: numbe
  * solid silhouette — the same visual weight as the bell and tab-bar icons
  * around it.
  */
-export function PersonIcon({
-  size = 20,
-  className,
-}: {
-  size?: number;
-  className?: string;
-}) {
+export function PersonIcon({ size = 20, className }: { size?: number; className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -202,7 +239,7 @@ export function Avatar({
       role="img"
       aria-label={name ? `${name} — no profile photo` : "No profile photo"}
       className={cn(
-        "grid place-items-center rounded-full bg-slate-100 text-ink-400 ring-1 ring-inset ring-black/5",
+        "grid place-items-center rounded-full bg-[#eef1ee] text-ink-400 ring-1 ring-inset ring-black/5",
         className,
       )}
       style={{ width: size, height: size }}
@@ -229,14 +266,17 @@ export function SectionHead({
   sub?: string;
 }) {
   return (
-    <div className="mb-3 flex items-end justify-between gap-3">
-      <div>
-        <h2 className="text-[16.5px] font-bold text-ink-900">{title}</h2>
-        {sub && <p className="mt-0.5 text-[13px] text-ink-500">{sub}</p>}
+    <div className="nm-sec-head">
+      <div className="min-w-0">
+        <h2 className="truncate">{title}</h2>
+        {sub && <p>{sub}</p>}
       </div>
       {action && href && (
-        <Link href={href} className="shrink-0 text-[13px] font-semibold text-brand-600 hover:text-brand-700">
-          {action} →
+        <Link href={href} className="nm-sec-link">
+          {action}
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h13M13 6l6 6-6 6" />
+          </svg>
         </Link>
       )}
     </div>
@@ -258,12 +298,12 @@ export function EmptyState({
   href?: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--line)] bg-white/60 px-6 py-12 text-center">
-      <div className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-2xl">{icon}</div>
-      <h3 className="text-[15.5px] font-bold text-ink-900">{title}</h3>
-      {body && <p className="mt-1.5 max-w-sm text-[13.5px] leading-relaxed text-ink-500">{body}</p>}
+    <div className="nm-empty">
+      <div className="nm-empty-ic">{icon}</div>
+      <h3 className="text-[19px]">{title}</h3>
+      {body && <p className="mt-2 max-w-[340px] text-[13.5px] leading-relaxed text-ink-500">{body}</p>}
       {action && href && (
-        <Link href={href} className="nm-btn-soft mt-4">
+        <Link href={href} className="nm-btn-soft mt-5">
           {action}
         </Link>
       )}
@@ -282,14 +322,14 @@ export function Alert({
   children: React.ReactNode;
 }) {
   const map = {
-    green: "bg-brand-50 text-brand-900 border-brand-500/20",
-    amber: "bg-amber-50 text-amber-900 border-amber-500/25",
-    red: "bg-red-50 text-red-900 border-red-500/25",
-    blue: "bg-sky-50 text-sky-900 border-sky-500/20",
+    green: "bg-brand-50 text-brand-900 border-brand-200",
+    amber: "bg-[#fdf7ec] text-[#7a4f08] border-[#f2d9a8]",
+    red: "bg-[#fff4f0] text-[#8f2f14] border-[#f7c9b8]",
+    blue: "bg-[#f2f7fd] text-[#1d4f91] border-[#cfe0f5]",
   };
   return (
-    <div className={cn("rounded-xl border px-3.5 py-3 text-[13px]", map[tone])}>
-      {title && <p className="font-semibold">{title}</p>}
+    <div className={cn("rounded-[14px] border px-4 py-3 text-[13px]", map[tone])}>
+      {title && <p className="font-bold">{title}</p>}
       <div className={cn(title && "mt-1", "leading-relaxed opacity-90")}>{children}</div>
     </div>
   );
@@ -298,7 +338,7 @@ export function Alert({
 /* ------------------------------------------------------------------ Spinner */
 export function Spinner({ className }: { className?: string }) {
   return (
-    <svg className={cn("h-4 w-4 animate-spin", className)} viewBox="0 0 24 24" fill="none">
+    <svg className={cn("h-4 w-4 animate-spin", className)} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity=".25" />
       <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
     </svg>
@@ -321,18 +361,18 @@ export function Stat({
 }) {
   const bg = {
     plain: "bg-white",
-    brand: "bg-brand-50/70",
-    amber: "bg-amber-50/70",
-    red: "bg-red-50/60",
+    brand: "bg-brand-50",
+    amber: "bg-[#fdf7ec]",
+    red: "bg-[#fff4f0]",
   }[tone];
   return (
-    <div className={cn("nm-card p-4", bg)}>
+    <div className={cn("nm-card-flat p-4 sm:p-5", bg)}>
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[12.5px] font-medium text-ink-500">{label}</p>
+        <p className="text-[11.5px] font-semibold text-ink-500">{label}</p>
         {icon}
       </div>
-      <p className="mt-1.5 text-[21px] font-extrabold tracking-tight text-ink-900">{value}</p>
-      {hint && <p className="mt-0.5 text-[12px] text-ink-400">{hint}</p>}
+      <p className="mt-2 font-display text-[25px] font-extrabold tracking-[-0.04em] text-ink-900">{value}</p>
+      {hint && <p className="mt-1 text-[11.5px] text-ink-400">{hint}</p>}
     </div>
   );
 }
@@ -350,20 +390,53 @@ export function Tabs({
       {items.map((t) => {
         const active = t.href === current;
         return (
-          <Link
-            key={t.href}
-            href={t.href}
-            className={cn("nm-chip", active && "nm-chip-active")}
-          >
+          <Link key={t.href} href={t.href} className={cn("nm-chip", active && "nm-chip-active")}>
             {t.label}
             {typeof t.count === "number" && t.count > 0 && (
-              <span className={cn("rounded-full px-1.5 py-px text-[11px]", active ? "bg-brand-500 text-white" : "bg-slate-100 text-ink-500")}>
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-px text-[10.5px] font-bold",
+                  active ? "bg-brand-500 text-white" : "bg-[#f1efe9] text-ink-500",
+                )}
+              >
                 {t.count}
               </span>
             )}
           </Link>
         );
       })}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ Page head */
+/**
+ * The heading block every inner page opens with: an optional breadcrumb, a
+ * display-size title and a supporting line. Kept here so search, services,
+ * orders, the seller hub and the admin console all start at the same
+ * vertical rhythm instead of each inventing its own padding.
+ */
+export function PageHead({
+  title,
+  sub,
+  crumb,
+  action,
+}: {
+  title: string;
+  sub?: string;
+  crumb?: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-4 pb-1 pt-2">
+      <div className="min-w-0">
+        {crumb && (
+          <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-ink-400">{crumb}</div>
+        )}
+        <h1 className="text-[26px] sm:text-[32px]">{title}</h1>
+        {sub && <p className="mt-2 max-w-[620px] text-[13.5px] leading-relaxed text-ink-500">{sub}</p>}
+      </div>
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 }
