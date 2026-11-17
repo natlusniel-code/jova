@@ -7,6 +7,9 @@ import { NotificationBridge } from "@/components/notification-bridge";
 import "./globals.css";
 // Responsive guards, imported separately so globals.css stays as it was.
 import "./responsive-guards.css";
+// Remaps the app's older cool-grey utilities onto the warm palette. Imported
+// after globals.css so it wins on cascade order. See the file's own comment.
+import "./legacy-palette.css";
 
 export const metadata: Metadata = {
   title: {
