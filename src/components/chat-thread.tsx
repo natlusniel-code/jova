@@ -689,13 +689,31 @@ export function ChatThread({
   }
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-8.5rem)] max-w-2xl flex-col md:h-[calc(100vh-7.5rem)]">
+    /* ── The floating chat card — reference 4-chat ──────────────────────
+       The thread is a card that floats on the page with a green glow,
+       not a full-bleed white page. `nm-chat-shell` carries the radius and
+       the glow; the inner column keeps the height maths the composer
+       depends on. On a phone the card goes edge-to-edge (the glow would
+       be clipped anyway) and on a wide screen it is a centred panel with
+       air around it. */
+    <div className="mx-auto w-full max-w-2xl">
+      <div className="nm-chat-shell flex h-[calc(100vh-11rem)] flex-col overflow-hidden px-3 pb-2 pt-3 sm:px-4 md:h-[calc(100vh-9.5rem)]">
       {/* header */}
       <div className="flex items-center gap-2.5 border-b border-[var(--line)] pb-2.5">
-        <Link href={basePath} className="rounded-lg p-1 text-ink-400 hover:text-ink-900" aria-label="Back">←</Link>
-        <Avatar name={amSeller ? otherName : (shopName ?? otherName)} src={amSeller ? otherAvatar : shopLogo} size={34} />
+        <Link
+          href={basePath}
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-ink-500 transition hover:bg-white hover:text-ink-900"
+          aria-label="Back to chats"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="m14 6-6 6 6 6" />
+          </svg>
+        </Link>
+        <Avatar name={amSeller ? otherName : (shopName ?? otherName)} src={amSeller ? otherAvatar : shopLogo} size={38} />
         <div className="min-w-0">
-          <p className="truncate text-[13.5px] font-bold text-ink-900">{amSeller ? otherName : (shopName ?? otherName)}</p>
+          <p className="truncate text-[14px] font-extrabold tracking-[-0.01em] text-ink-900">
+            {amSeller ? otherName : (shopName ?? otherName)}
+          </p>
           {/* The role label stays; the online/offline headline sits beside
               it. Green "Online", black "Offline", updated live. */}
           <div className="flex items-center gap-1.5">
@@ -707,9 +725,9 @@ export function ChatThread({
         {order && (
           <Link
             href={amSeller ? "/seller/orders" : `/orders/${order.id}`}
-            className="ml-auto text-[11.5px] font-semibold text-brand-600"
+            className="ml-auto shrink-0 rounded-full bg-white px-3 py-1.5 text-[11.5px] font-bold text-brand-700 shadow-[0_1px_3px_rgba(16,24,24,.08)]"
           >
-            View order →
+            View order
           </Link>
         )}
       </div>
@@ -763,9 +781,9 @@ export function ChatThread({
           deliveryDays={order.delivery_days ?? null}
         />
       ) : (
-      <div className="nm-scroll mt-2 flex-1 space-y-2 overflow-y-auto py-2">
+      <div className="nm-scroll mt-2 flex-1 space-y-2.5 overflow-y-auto py-2">
         {messages.length === 0 && (
-          <div className="mx-auto mt-8 max-w-xs rounded-xl bg-slate-50 px-3 py-3 text-center text-[12px] leading-relaxed text-ink-500">
+          <div className="mx-auto mt-8 max-w-xs rounded-2xl bg-white px-4 py-3.5 text-center text-[12px] leading-relaxed text-ink-500 shadow-[0_1px_3px_rgba(16,24,24,.06)]">
             No messages yet. {amSeller
               ? "Ask the buyer what they need — then send an offer with your price."
               : "Say hello and describe what you need. The seller will send a price."}
@@ -778,8 +796,8 @@ export function ChatThread({
           return (
             <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[78%] rounded-2xl px-3 py-2 text-[13px] leading-relaxed ${
-                  mine ? "bg-brand-500 text-white" : "bg-white text-ink-900 shadow-card"
+                className={`max-w-[78%] px-3.5 py-2.5 text-[13px] leading-relaxed ${
+                  mine ? "nm-bubble-out" : "nm-bubble-in"
                 } ${m.failed ? "opacity-60 ring-1 ring-red-400" : ""}`}
               >
                 {m.image_url && (
@@ -1077,7 +1095,7 @@ export function ChatThread({
       {tab === "chat" && (
       <form
         onSubmit={send}
-        className="sticky bottom-0 z-20 -mx-1 flex items-end gap-1.5 border-t border-[var(--line)] bg-white/95 px-1 pb-1 pt-2 backdrop-blur"
+        className="sticky bottom-0 z-20 mt-1 flex items-end gap-1.5 border-t border-[var(--line)] bg-[var(--nm-cream)]/95 px-0 pb-1 pt-2.5 backdrop-blur"
         style={{
           // The keyboard lifts the composer by exactly its own height
           // (`--nm-kb`, set from the visual viewport). The safe-area inset
@@ -1085,8 +1103,19 @@ export function ChatThread({
           marginBottom: "calc(var(--nm-kb, 0px) + env(safe-area-inset-bottom, 0px))",
         }}
       >
-        <label className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-xl text-ink-400 hover:bg-slate-50 hover:text-brand-600">
-          {uploading ? <Spinner className="!h-4 !w-4" /> : "📎"}
+        {/* Attach — a plus, as the reference draws it, not a paperclip. */}
+        <label
+          className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-[13px] border border-[var(--line)] bg-white text-ink-600 transition hover:border-brand-300 hover:text-brand-700"
+          aria-label="Add a photo"
+          title="Add a photo"
+        >
+          {uploading ? (
+            <Spinner className="!h-4 !w-4" />
+          ) : (
+            <svg viewBox="0 0 24 24" className="h-[19px] w-[19px]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          )}
           <input type="file" accept="image/*" className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) stageImage(f); e.currentTarget.value = ""; }} />
         </label>
@@ -1094,35 +1123,42 @@ export function ChatThread({
             Sits next to the attach button because it is the same kind of
             action — adding something other than text to the message. It is
             a button, not an automatic read, so nothing happens until it is
-            pressed. */}
+            pressed. The glyph is the real map-pin, not an emoji. */}
         <button
           type="button"
           onClick={stageLocation}
           disabled={locating || busy}
           aria-label="Share my location in this chat"
           title="Share my location"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-ink-400 hover:bg-slate-50 hover:text-brand-600 disabled:opacity-50"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-[13px] border border-[var(--line)] bg-white text-ink-600 transition hover:border-brand-300 hover:text-brand-700 disabled:opacity-50"
         >
-          {locating ? <Spinner className="!h-4 !w-4" /> : "📍"}
+          {locating ? (
+            <Spinner className="!h-4 !w-4" />
+          ) : (
+            <svg viewBox="0 0 24 24" className="h-[19px] w-[19px]" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 21s7-6.1 7-11a7 7 0 1 0-14 0c0 4.9 7 11 7 11Z" />
+              <circle cx="12" cy="10" r="2.5" />
+            </svg>
+          )}
         </button>
         {amSeller && isServiceShop && hasAcceptedOffer && order ? (
           <button
             type="button"
             onClick={() => setTab("delivery")}
-            className="shrink-0 rounded-xl bg-brand-500 px-2.5 py-2 text-[11.5px] font-bold text-white hover:bg-brand-600"
+            className="shrink-0 rounded-[13px] bg-brand-500 px-2.5 py-2.5 text-[11.5px] font-bold text-white hover:bg-brand-600"
           >
             Deliver
           </button>
         ) : amSeller ? (
           <button type="button" onClick={() => setOfferOpen((o) => !o)}
-            className="shrink-0 rounded-xl border border-[var(--line)] px-2.5 py-2 text-[11.5px] font-semibold text-ink-700 hover:bg-slate-50">
+            className="shrink-0 rounded-[13px] border border-[var(--line)] bg-white px-2.5 py-2.5 text-[11.5px] font-semibold text-ink-700 hover:bg-slate-50">
             Offer
           </button>
         ) : null}
         <textarea
           ref={box}
           rows={1}
-          className="nm-input max-h-[40vh] min-h-[42px] flex-1 resize-none !py-2.5 leading-relaxed"
+          className="nm-chat-input max-h-[40vh] min-h-[44px] flex-1 resize-none px-3.5 py-3 text-[13.5px] leading-relaxed outline-none focus:border-brand-400"
           placeholder="Message…"
           value={text}
           onChange={(e) => {
@@ -1141,8 +1177,22 @@ export function ChatThread({
             }
           }}
         />
-        <button type="submit" disabled={busy || !text.trim()} className="nm-btn-primary shrink-0 !px-3.5 !py-2.5">
-          Send
+        {/* Send — the green rounded square with the paper plane, as the
+            reference draws it. */}
+        <button
+          type="submit"
+          disabled={busy || !text.trim()}
+          aria-label="Send message"
+          className="nm-chat-send shrink-0"
+        >
+          {busy ? (
+            <Spinner className="!h-4 !w-4" />
+          ) : (
+            <svg viewBox="0 0 24 24" className="h-[19px] w-[19px]" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4.5 12 20 4.5 15.5 20l-3.6-6.1L4.5 12Z" />
+              <path d="m11.9 13.9 8.1-9.4" />
+            </svg>
+          )}
         </button>
       </form>
       )}
@@ -1158,6 +1208,7 @@ export function ChatThread({
           onClose={() => setOpenPin(null)}
         />
       )}
+      </div>
     </div>
   );
 }
