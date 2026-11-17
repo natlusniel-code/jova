@@ -254,6 +254,11 @@ export function CheckoutFlow({
             // gig_packages, so a tampered cart cannot buy Premium for
             // Basic money.
             package_tier: l.packageTier ?? null,
+            // The variant choice (sql/0049). place_order validates it
+            // against the listing's own sizes/colors, so a tampered cart
+            // cannot order a size the seller does not stock.
+            size: l.size ?? null,
+            color: l.color ?? null,
           })),
           // A service-only shop is recorded as 'delivery' with no address:
           // place_order already charges no fee when the basket holds no
@@ -455,9 +460,16 @@ export function CheckoutFlow({
 
               <div className="divide-y divide-[var(--line)] px-4">
                 {s.lines.map((l) => (
-                  <div key={l.listingId} className="flex justify-between gap-3 py-2.5">
+                  <div key={`${l.listingId}::${l.size ?? ""}::${l.color ?? ""}`} className="flex justify-between gap-3 py-2.5">
                     <p className="text-[12.5px] text-ink-600">
                       {l.title} <span className="text-ink-400">×{l.quantity}</span>
+                      {/* The chosen variant, so the seller packs the right
+                          one. Absent for a product with no options. */}
+                      {(l.size || l.color) && (
+                        <span className="mt-0.5 block text-[11px] font-medium text-ink-500">
+                          {[l.size && `Size ${l.size}`, l.color].filter(Boolean).join(" · ")}
+                        </span>
+                      )}
                     </p>
                     <p className="shrink-0 text-[12.5px] font-semibold text-ink-900">{naira(l.price * l.quantity)}</p>
                   </div>
