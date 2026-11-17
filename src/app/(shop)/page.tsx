@@ -12,6 +12,7 @@ import {
 } from "@/lib/queries";
 import { anonymousSeed } from "@/lib/stable-random";
 import { ListingCard, ShopCard, placeLabel } from "@/components/cards";
+import { SellerCarousel } from "@/components/seller-carousel";
 import { GigCard } from "@/components/gig-card";
 import { ListingTabs } from "@/components/listing-tabs";
 import { LocationFilter } from "@/components/location-filter";
@@ -23,7 +24,7 @@ export const dynamic = "force-dynamic";
 
 type SP = { city?: string; tab?: string };
 
-/* ── Small local icons ──────────────────────────────────────────────────
+/* ── Small local icons ────────────────────────────────────────────────
    Inline so the hero and the trust strip carry no icon-font request. */
 function Icon({ name, className }: { name: string; className?: string }) {
   const p = {
@@ -102,10 +103,10 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
   // the default is products and `?tab=service` switches to gigs.
   const tab: "product" | "service" = searchParams.tab === "service" ? "service" : "product";
 
-  // ── Which three verified sellers this visitor sees ─────────────────────
+  // ── Which verified sellers this visitor sees ────────────────────────
   // The row is random per account but stable for that account: the seed is the
-  // signed-in user's id, so the same buyer always gets the same three shops
-  // while a different buyer gets a different three. An anonymous visitor has
+  // signed-in user's id, so the same buyer always gets the same shops
+  // while a different buyer gets a different set. An anonymous visitor has
   // no id, so the seed is derived from the request headers — hashed, never
   // stored — which keeps the row steady across a few page loads without
   // recording anything about the person. See src/lib/stable-random.ts.
@@ -117,9 +118,11 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
   const [categories, places, shops, products, services, savedIds] = await Promise.all([
     getCategories(),
     getPlaces(),
-    // Three, not six: the storefront row is a taste of the marketplace, and
-    // "See all" is the way to the full directory.
-    getNearbyShops(city, 3, shopSeed),
+    // Six, not three: the carousel shows one seller at a time and advances
+    // every 5 seconds, so it needs a few to rotate through. The order is
+    // still seeded per visitor (see stable-random.ts), so it is random
+    // between buyers but stable for one buyer.
+    getNearbyShops(city, 6, shopSeed),
     // Ranked + rotated daily by storefront_feed (sql/0015): a balanced mix of
     // new, well-rated, best-selling and most-viewed listings rather than
     // "the newest 8", which let the same listings own page one forever.
@@ -256,7 +259,7 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
             </div>
           </div>
 
-          {/* ── Showcase column ──────────────────────────────────────────
+          {/* ── Showcase column ─────────────────────────────────────────
               Three real listings, stacked as a tidy vertical column rather
               than a fanned collage. The fan looked good in a mockup but in
               the real page the rotated cards spilled out of their grid
@@ -408,11 +411,10 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
             action="See all"
             href={`/search?verified=1${city ? `&city=${encodeURIComponent(city)}` : `&city=${ALL_CITIES}`}`}
           />
-          <div className="nm-rail -mx-4 px-4 sm:mx-0 sm:px-0">
-            {shops.map((s) => (
-              <ShopCard key={s.id} s={s} />
-            ))}
-          </div>
+          {/* One seller per view, advancing every 5 seconds — reference 3.
+              The card is wide but not full-bleed, so the next one peeks in
+              at the edge and the row reads as a carousel. */}
+          <SellerCarousel shops={shops} />
         </section>
       )}
 
