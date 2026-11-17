@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 
 type SP = { city?: string; tab?: string };
 
-/* ── Small local icons ────────────────────────────────────────────────
+/* ── Small local icons ──────────────────────────────────────────────────
    Inline so the hero and the trust strip carry no icon-font request. */
 function Icon({ name, className }: { name: string; className?: string }) {
   const p = {
@@ -103,7 +103,7 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
   // the default is products and `?tab=service` switches to gigs.
   const tab: "product" | "service" = searchParams.tab === "service" ? "service" : "product";
 
-  // ── Which verified sellers this visitor sees ────────────────────────
+  // ── Which verified sellers this visitor sees ────────────────────────────
   // The row is random per account but stable for that account: the seed is the
   // signed-in user's id, so the same buyer always gets the same shops
   // while a different buyer gets a different set. An anonymous visitor has
@@ -178,7 +178,7 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
         />
 
         <div className="relative grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-12">
-          {/* ── Copy column ─────────────────────────────────────────── */}
+          {/* ── Copy column ─────────────────────────────────────────────── */}
           <div className="min-w-0">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11.5px] font-bold tracking-wide text-[#dff5e6]">
               <span className="relative flex h-1.5 w-1.5">
@@ -259,7 +259,7 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
             </div>
           </div>
 
-          {/* ── Showcase column ─────────────────────────────────────────
+          {/* ── Showcase column ──────────────────────────────────────────
               Three real listings, stacked as a tidy vertical column rather
               than a fanned collage. The fan looked good in a mockup but in
               the real page the rotated cards spilled out of their grid
@@ -546,42 +546,6 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════════════════════
-          SELLER CTA
-          A lime band — the one high-energy surface on the page — for the
-          other half of the marketplace.
-          ══════════════════════════════════════════════════════════════════ */}
-      <section className="nm-sec overflow-hidden rounded-[26px] bg-[linear-gradient(120deg,#cbf26b_0%,#d9f68f_55%,#e8fbb4_100%)] px-6 py-8 sm:px-9 sm:py-10">
-        <div className="flex flex-wrap items-center justify-between gap-6">
-          <div className="max-w-[520px]">
-            <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#3d5a1c]">
-              For sellers
-            </p>
-            <h2 className="mt-2 text-[24px] leading-tight text-[#16240f] sm:text-[29px]">
-              Turn your shop into a storefront that reaches every state.
-            </h2>
-            <p className="mt-2.5 text-[13.5px] leading-relaxed text-[#3a4a24]">
-              List in minutes, chat with buyers, and get paid the moment delivery is confirmed.
-              No listing fees to start.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <Link
-              href="/seller"
-              className="inline-flex h-[46px] items-center gap-2 rounded-[14px] bg-[#16240f] px-6 text-[14px] font-bold text-white transition hover:bg-[#0d1708]"
-            >
-              Open a shop
-              <Icon name="arrow" className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/help"
-              className="inline-flex h-[46px] items-center rounded-[14px] border border-[#16240f]/20 bg-white/50 px-5 text-[14px] font-bold text-[#16240f] transition hover:bg-white/80"
-            >
-              How it works
-            </Link>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
