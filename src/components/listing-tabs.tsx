@@ -9,6 +9,10 @@ import { cn } from "@/lib/utils";
  * — with a "See more" link that leads to the full sub page. Both are
  * rendered as links rather than client-side state so the tab survives a
  * refresh, can be shared, and works without JavaScript.
+ *
+ * The tabs are pill-shaped rather than underlined: on the warm canvas a
+ * filled pill reads as the active filter far more clearly than a 2px rule,
+ * and it matches the category chips directly above it.
  */
 export function ListingTabs({
   current,
@@ -24,13 +28,13 @@ export function ListingTabs({
   seeMoreLabel?: string;
 }) {
   const tabs = [
-    { key: "product" as const, label: "Product Listing", href: productHref },
-    { key: "service" as const, label: "Service Gig", href: serviceHref },
+    { key: "product" as const, label: "Products", href: productHref },
+    { key: "service" as const, label: "Services", href: serviceHref },
   ];
 
   return (
-    <div className="mb-3 flex items-end justify-between gap-3 border-b border-[var(--line)]">
-      <div className="flex items-center gap-1">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-white p-1 shadow-card">
         {tabs.map((t) => {
           const active = t.key === current;
           return (
@@ -39,10 +43,8 @@ export function ListingTabs({
               href={t.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "-mb-px border-b-2 px-1 pb-2.5 pt-1 text-[15px] font-bold transition",
-                active
-                  ? "border-brand-600 text-ink-900"
-                  : "border-transparent text-ink-400 hover:text-ink-700",
+                "rounded-full px-4 py-1.5 text-[13px] font-bold transition",
+                active ? "bg-brand-500 text-white shadow-sm" : "text-ink-500 hover:text-ink-900",
               )}
             >
               {t.label}
@@ -51,11 +53,11 @@ export function ListingTabs({
         })}
       </div>
 
-      <Link
-        href={seeMoreHref}
-        className="mb-2.5 shrink-0 whitespace-nowrap text-[13px] font-semibold text-brand-600 hover:text-brand-700"
-      >
-        {seeMoreLabel} →
+      <Link href={seeMoreHref} className="nm-sec-link">
+        {seeMoreLabel}
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12h13M13 6l6 6-6 6" />
+        </svg>
       </Link>
     </div>
   );
