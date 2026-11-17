@@ -58,3 +58,15 @@
 /* ── Radii: the old 2xl/3xl steps → the system's ────────────────────── */
 .rounded-2xl { border-radius: var(--r-lg); }
 .rounded-3xl { border-radius: var(--r-xl); }
+
+/* ── Dark fills → the brand's deep green ──────────────────────────────
+   `bg-ink-900` was the app's "solid dark button / dark panel" fill, and a
+   few overlays used `bg-black/…`. The brief rules out a black background,
+   so every one of them becomes the deep brand green. `ink` stays a TEXT
+   ramp only — nothing in the app paints a black surface any more. */
+.bg-ink-900 { background-color: var(--brand-deep); }
+.bg-slate-900, .bg-gray-900, .bg-neutral-900, .bg-zinc-900 { background-color: var(--brand-deep); }
+.bg-black { background-color: #04281a; }
+.bg-black\/70 { background-color: rgb(4 40 26 / 0.75); }
+.bg-black\/60 { background-color: rgb(4 40 26 / 0.65); }
+.bg-black\/10 { background-color: rgb(4 40 26 / 0.10); }
