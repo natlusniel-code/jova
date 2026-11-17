@@ -1,5 +1,5 @@
 import { Logo, Badge } from "@/components/ui";
-import { AdminNav } from "@/components/admin/admin-nav";
+import { AdminNav, AdminSidebar } from "@/components/admin/admin-nav";
 import { hasAdminKey } from "@/lib/supabase/admin";
 import { dispatchPushSafely } from "@/lib/push";
 import Link from "next/link";
@@ -36,19 +36,20 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-screen bg-[var(--canvas)]">
-      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-white">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5">
+      <header className="nm-sticky-chrome sticky top-0 z-30 border-b border-[var(--line)] bg-[#f6f5f1]/95 backdrop-blur-md">
+        <div className="nm-wrap flex min-w-0 items-center gap-3 py-3">
           <Logo />
+          <span className="hidden h-5 w-px bg-[var(--line)] sm:block" />
           <Badge tone="gray" className="hidden sm:inline-flex">
-            Admin
+            Admin console
           </Badge>
-          <div className="ml-auto flex items-center gap-3 text-[12.5px]">
-            <Link href="/" className="font-semibold text-ink-500 hover:text-ink-900">
+          <div className="ml-auto flex shrink-0 items-center gap-2 text-[12.5px]">
+            <Link href="/" className="nm-btn-ghost nm-btn-sm">
               Storefront
             </Link>
           </div>
         </div>
-        <div className="mx-auto max-w-7xl px-4">
+        <div className="nm-wrap">
           <AdminNav />
         </div>
       </header>
@@ -58,10 +59,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           expected state: it says so loudly instead of rendering an empty
           dashboard that looks like "no orders yet". */}
       {!hasAdminKey && (
-        <div className="mx-auto max-w-7xl px-4 pt-3">
-          <div className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-[12.5px] text-amber-900">
+        <div className="nm-wrap pt-4">
+          <div className="rounded-xl border border-[#f2d9a8] bg-[#fdf7ec] px-3.5 py-2.5 text-[12.5px] text-[#7a4f08]">
             <strong className="font-bold">Admin database access is not configured.</strong>{" "}
-            <code className="rounded bg-amber-100 px-1 py-0.5 font-mono">
+            <code className="rounded bg-[#fbeed3] px-1 py-0.5 font-mono">
               SUPABASE_SERVICE_ROLE_KEY
             </code>{" "}
             is not set on this server. There is no committed fallback any more — a key in the
@@ -71,7 +72,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
       )}
 
-      <main className="mx-auto max-w-7xl px-4 py-4 pb-16">{children}</main>
+      <div className="nm-wrap flex gap-8 py-6 pb-20">
+        <AdminSidebar />
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
     </div>
   );
 }

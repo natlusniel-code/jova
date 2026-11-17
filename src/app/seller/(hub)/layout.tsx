@@ -5,7 +5,7 @@ import { dispatchPushSafely } from "@/lib/push";
 import { sellerGatePath } from "@/lib/seller-gate";
 import { isBuyerAccount } from "@/lib/roles";
 import { Logo, Badge, Avatar } from "@/components/ui";
-import { SellerNav } from "@/components/seller/seller-nav";
+import { SellerNav, SellerSidebar } from "@/components/seller/seller-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { InstallAppPrompt } from "@/components/install-app-prompt";
 import { SellerPresence } from "@/components/seller/seller-presence";
@@ -33,7 +33,7 @@ export default async function SellerLayout({ children }: { children: React.React
     // a delivery problem must never break a page
   }
 
-  // ── Buyers never see the Seller Hub ──────────────────────────────────────
+  // ── Buyers never see the Seller Hub ────────────────────────────────────
   // The hub is seller-only. A buyer account can still own a `shops` row (an
   // earlier shop, a re-assigned or seeded row), and the approval gate below
   // would then let them straight into the seller dashboard and its account
@@ -46,7 +46,7 @@ export default async function SellerLayout({ children }: { children: React.React
   // role read.
   if (isBuyerAccount(session.profile, session.shop)) redirect("/");
 
-  // ── The approval gate ────────────────────────────────────────────────────
+  // ── The approval gate ──────────────────────────────────────────────────
   // Every seller-only page lives under this layout, so this one check is what
   // keeps an unapproved seller out of the hub. They are sent back to the exact
   // step they are on (business profile → verification → plan → pending
@@ -71,44 +71,55 @@ export default async function SellerLayout({ children }: { children: React.React
 
   return (
     <div className="min-h-screen bg-[var(--canvas)]">
-      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-white">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2.5">
+      {/* ── Header ────────────────────────────────────────────────────────
+          Sticky, warm off-white, hairline rule. The shop identity sits on
+          the left, the account cluster on the right, and the mobile nav
+          scrolls underneath. */}
+      <header className="nm-sticky-chrome sticky top-0 z-30 border-b border-[var(--line)] bg-[#f6f5f1]/95 backdrop-blur-md">
+        <div className="nm-wrap flex min-w-0 items-center gap-3 py-3">
           <Logo />
-          <Badge tone="blue" className="hidden sm:inline-flex">Seller hub</Badge>
+          <span className="hidden h-5 w-px bg-[var(--line)] sm:block" />
+          <Badge tone="green" className="hidden sm:inline-flex">
+            Seller hub
+          </Badge>
           {shop && (
             <Link
               href={`/shop/${shop.slug}`}
-              className="ml-1 hidden text-[12.5px] font-semibold text-brand-600 hover:underline sm:inline"
+              className="hidden min-w-0 items-center gap-1.5 truncate text-[12.5px] font-semibold text-ink-500 transition hover:text-brand-600 md:inline-flex"
             >
-              View public shop ↗
+              <span className="truncate">{shop.name}</span>
+              <svg viewBox="0 0 24 24" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 17 17 7M9 7h8v8" />
+              </svg>
             </Link>
           )}
-          <div className="ml-auto flex items-center gap-3">
-            {/* Sellers are redirected out of the storefront, so a "Marketplace"
-                link to `/` would bounce them straight back here. Their own
-                public shop is the useful destination instead. */}
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             {shop && (
-              <Link
-                href={`/shop/${shop.slug}`}
-                className="text-[12.5px] font-semibold text-ink-500 hover:text-ink-900"
-              >
-                My shop
+              <Link href={`/shop/${shop.slug}`} className="nm-btn-ghost nm-btn-sm hidden sm:inline-flex">
+                View shop
               </Link>
             )}
             <NotificationBell unread={unreadNotifications} allHref="/seller/notifications" />
-            <Link href="/profile" aria-label="Profile">
-              <Avatar name={session.profile.full_name} src={session.profile.avatar_url} size={30} />
+            <Link href="/profile" aria-label="Profile" className="ml-0.5">
+              <Avatar name={session.profile.full_name} src={session.profile.avatar_url} size={36} />
             </Link>
           </div>
         </div>
         {shop && (
-          <div className="mx-auto max-w-6xl px-4">
+          <div className="nm-wrap">
             <SellerNav unreadMessages={unreadMessages} />
           </div>
         )}
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-4 pb-16">{children}</main>
+      {/* ── Body: sidebar + content ───────────────────────────────────────
+          The sidebar is 236px and the content column is capped at 1000px,
+          with a 32px gutter between them. On a phone the sidebar is gone
+          and the content takes the full width. */}
+      <div className="nm-wrap flex gap-8 py-6 pb-20">
+        {shop && <SellerSidebar unreadMessages={unreadMessages} />}
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
 
       {/*
         The presence heartbeat.
