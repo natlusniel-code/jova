@@ -118,7 +118,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
           </p>
           <dl className="mt-2 space-y-1.5 text-[12.5px]">
             <div className="flex justify-between"><dt className="text-ink-500">Order value</dt><dd className="font-medium">{naira(o.total)}</dd></div>
-            <div className="flex justify-between"><dt className="text-ink-500">NaijaMart commission ({Math.round(Number(o.commission_rate) * 100)}%)</dt><dd className="font-medium text-ink-500">−{naira(o.commission_amount)}</dd></div>
+            <div className="flex justify-between"><dt className="text-ink-500">Jova commission ({Math.round(Number(o.commission_rate) * 100)}%)</dt><dd className="font-medium text-ink-500">−{naira(o.commission_amount)}</dd></div>
             <div className="flex justify-between border-t border-[var(--line)] pt-1.5"><dt className="font-semibold text-ink-900">{isSeller ? "Net payout" : "Seller receives"}</dt><dd className="font-extrabold text-ink-900">{naira(o.payout_amount)}</dd></div>
             <div className="flex items-center justify-between pt-1">
               <dt className="text-ink-500">Payout status</dt>
@@ -132,7 +132,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
           <p className="mt-2 text-[11.5px] leading-relaxed text-ink-400">
             {isSeller
               ? "We release this to you 4 days after the buyer confirms. The 5% commission is already taken out."
-              : "The seller only gets this after you confirm delivery. Until then it sits in NaijaMart's escrow account."}
+              : "The seller only gets this after you confirm delivery. Until then it sits in Jova's escrow account."}
           </p>
         </div>
       </div>

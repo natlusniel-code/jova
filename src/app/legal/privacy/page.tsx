@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { POLICY_EFFECTIVE_DATE, POLICY_LAST_UPDATED } from "../policy-content";
 
-export const metadata = { title: "Privacy Policy — NaijaMart" };
+export const metadata = { title: "Privacy Policy — Jova" };
 
 export default function PrivacyPage() {
   return (
@@ -13,10 +13,10 @@ export default function PrivacyPage() {
 
       <div className="mt-4 space-y-4 text-[13.5px] leading-relaxed text-ink-600">
         <p>
-          This Privacy Policy explains how NaijaMart handles personal information. It forms part of
+          This Privacy Policy explains how Jova handles personal information. It forms part of
           the{" "}
           <Link href="/legal" className="font-semibold text-brand-600 hover:underline">
-            NaijaMart Marketplace Policy
+            Jova Marketplace Policy
           </Link>
           .
         </p>

@@ -67,7 +67,7 @@ export default async function AdminDashboard() {
         <div>
           <h1 className="text-[22px] font-extrabold tracking-tight text-ink-900">Dashboard</h1>
           <p className="mt-0.5 text-[12.5px] text-ink-500">
-            All of NaijaMart · {shortDate(new Date().toISOString())}
+            All of Jova · {shortDate(new Date().toISOString())}
           </p>
         </div>
       </div>

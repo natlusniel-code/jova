@@ -136,7 +136,7 @@ export function InstallAppPrompt() {
         <div className="min-w-0 flex-1">
           <p className="text-[13.5px] font-bold text-ink-900">Install app</p>
           <p className="mt-0.5 text-[12px] leading-snug text-ink-500">
-            Add NaijaMart to your phone&apos;s home screen — it opens full screen, like an app.
+            Add Jova to your phone&apos;s home screen — it opens full screen, like an app.
           </p>
           {note && <p className="mt-1.5 text-[11.5px] leading-snug text-amber-700">{note}</p>}
           <div className="mt-2 flex items-center gap-2">

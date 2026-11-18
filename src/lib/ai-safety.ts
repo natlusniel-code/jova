@@ -81,7 +81,7 @@ export async function analyseSafety(input: {
 
   const report = await aiTry(() =>
     aiJson<SafetyReport>({
-      prompt: `You are a trust & safety analyst for NaijaMart, a Nigerian marketplace that holds every payment in escrow.
+      prompt: `You are a trust & safety analyst for Jova, a Nigerian marketplace that holds every payment in escrow.
 
 Analyse this ${input.subjectType} and return a risk report.
 

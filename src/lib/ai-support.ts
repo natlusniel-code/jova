@@ -43,14 +43,14 @@ export type SupportAnswer = {
  * obvious in review.
  */
 const RULES = [
-  "Payment: NaijaMart holds the buyer's money in escrow. The seller is only paid after the buyer confirms the item arrived as described.",
+  "Payment: Jova holds the buyer's money in escrow. The seller is only paid after the buyer confirms the item arrived as described.",
   "Delivery: it depends on the seller and the city. Most sellers in the same city deliver within 1-3 days. The delivery fee and estimate are shown at checkout.",
   "Pickup: if a seller offers pickup, the buyer can collect from the shop and pays no delivery fee. The shop address and a map link appear on the listing, in the cart, at checkout and on the order page.",
   "Cross-city: a buyer can buy from a seller in another city. The home page defaults to the buyer's city but the location filter has an 'All cities' option.",
-  "Becoming a seller: create an account, choose 'Sell on NaijaMart', and complete the four-step onboarding with a valid NIN or CAC number and bank details.",
+  "Becoming a seller: create an account, choose 'Sell on Jova', and complete the four-step onboarding with a valid NIN or CAC number and bank details.",
   "Missing order: open the order and tap 'Raise an issue'. The money stays in escrow while support reviews it.",
   "Refunds: if an order is not delivered as described, the buyer raises an issue on the order and support decides. Money in escrow is returned to the buyer when the dispute is resolved in their favour.",
-  "Contacting a human: the Help page has a WhatsApp link to NaijaMart support.",
+  "Contacting a human: the Help page has a WhatsApp link to Jova support.",
 ];
 
 /**
@@ -124,7 +124,7 @@ export async function askSupport(
     aiText({
       fast: true,
       maxTokens: 400,
-      prompt: `You are NaijaMart's buyer support assistant. You help a shopper in Nigeria understand their orders, delivery, pickup and payments.
+      prompt: `You are Jova's buyer support assistant. You help a shopper in Nigeria understand their orders, delivery, pickup and payments.
 
 Rules you may state as fact:
 ${RULES.map((r) => `- ${r}`).join("\n")}

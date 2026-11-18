@@ -113,7 +113,7 @@ export async function bridgeGoogleSession(input: {
     return {
       ok: false,
       error:
-        "Your Google account did not share an email address, so we cannot create a NaijaMart account. Try a different Google account.",
+        "Your Google account did not share an email address, so we cannot create a Jova account. Try a different Google account.",
     };
   }
 

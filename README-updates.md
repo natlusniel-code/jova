@@ -1,7 +1,7 @@
 
 ---
 
-# NaijaMart — one account, one role
+# Jova — one account, one role
 
 Fixes the reported bug: **a buyer who had become a seller was still being sent
 to the storefront on sign-in**, and the account `sultananifowose@gmail.com`

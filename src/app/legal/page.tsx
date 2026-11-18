@@ -3,9 +3,9 @@ import { PolicyBody } from "./policy-body";
 import { POLICY_EFFECTIVE_DATE, POLICY_LAST_UPDATED } from "./policy-content";
 
 export const metadata = {
-  title: "NaijaMart Marketplace Policy",
+  title: "Jova Marketplace Policy",
   description:
-    "The NaijaMart Marketplace Policy — buyer and seller rules, payments and escrow, orders, delivery, returns, disputes, privacy and more.",
+    "The Jova Marketplace Policy — buyer and seller rules, payments and escrow, orders, delivery, returns, disputes, privacy and more.",
 };
 
 export default function LegalPage() {
@@ -13,10 +13,10 @@ export default function LegalPage() {
     <article>
       <header className="mb-5">
         <h1 className="text-[24px] font-extrabold leading-tight tracking-tight text-ink-900 sm:text-[28px]">
-          NaijaMart Marketplace Policy
+          Jova Marketplace Policy
         </h1>
         <p className="mt-1.5 text-[13px] text-ink-500">
-          Plain-English rules for buying and selling on NaijaMart in Nigeria.
+          Plain-English rules for buying and selling on Jova in Nigeria.
         </p>
         <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-ink-500">
           <div className="flex gap-1.5">

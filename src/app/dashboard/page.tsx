@@ -91,7 +91,7 @@ export default async function DashboardPage() {
         </section>
 
         <p className="mt-6 text-[11.5px] leading-relaxed text-ink-400">
-          Signed in with Google. Your NaijaMart account is linked to{" "}
+          Signed in with Google. Your Jova account is linked to{" "}
           {profile.email ?? "your Google account"}.
         </p>
       </main>

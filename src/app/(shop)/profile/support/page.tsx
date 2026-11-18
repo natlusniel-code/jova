@@ -46,7 +46,7 @@ export default async function SupportPage() {
       <Card className="p-4">
         <p className="text-[13.5px] font-bold text-ink-900">Need a human?</p>
         <p className="mt-1 text-[12.5px] leading-relaxed text-ink-500">
-          The Help page has the FAQ and a WhatsApp link to NaijaMart support. If an order went
+          The Help page has the FAQ and a WhatsApp link to Jova support. If an order went
           wrong, open it and tap “Raise an issue” — your money stays in escrow while it is reviewed.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">

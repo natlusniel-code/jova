@@ -10,7 +10,7 @@ export const metadata = { title: "Finish your account" };
  * `/signup/complete` — the step a Google buyer lands on.
  *
  * ── Why this page exists ──────────────────────────────────────────────────
- * Google gives us a name and a verified email, and nothing else. NaijaMart
+ * Google gives us a name and a verified email, and nothing else. Jova
  * needs two more things before a buyer can actually use the marketplace:
  *
  *   • a phone number — it is the password-reset factor, and the only way a

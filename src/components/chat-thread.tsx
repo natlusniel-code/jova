@@ -11,6 +11,7 @@ import { canGeolocate, coordsLabel, geolocationErrorMessage, getCurrentCoords } 
 import { MapPopup } from "@/components/map-popup";
 import { AiReplySuggestion } from "@/components/seller/ai-reply-suggestion";
 import { PresenceHeadline, TypingDots, useChatPresence } from "@/components/chat-live";
+import { withLoaderMuted } from "@/lib/global-loader";
 
 type Msg = {
   id: string;
@@ -413,38 +414,52 @@ export function ChatThread({
     setBusy(true);
 
     const supabase = createClient();
-    const { data, error } = await supabase.rpc("send_chat_message", {
-      p_chat_id: chatId,
-      p_body: body,
-      p_image_url: null,
-      p_package_ids: packageIds?.length ? packageIds : null,
-    });
+    /*
+      The global star loader is muted for the whole send.
 
-    setBusy(false);
+      A message send is a write the sender can already see: the bubble is
+      rendered optimistically and `setBusy` drives the composer's own pending
+      state. Raising the site-wide loader on top of that put a spinning star
+      over the middle of the conversation on every single send, which reads as
+      the chat reloading and hides the thread at the exact moment the buyer is
+      watching for a reply. `withLoaderMuted` keeps the loader store quiet for
+      the duration (including the `fetch` patch that would otherwise catch the
+      AI-reply request below) and unwinds in a `finally`, so a throw can never
+      leave the site permanently muted.
+    */
+    await withLoaderMuted(async () => {
+      const { data, error } = await supabase.rpc("send_chat_message", {
+        p_chat_id: chatId,
+        p_body: body,
+        p_image_url: null,
+        p_package_ids: packageIds?.length ? packageIds : null,
+      });
 
-    if (error) {
-      setErr(error.message);
-      return;
-    }
+      setBusy(false);
 
-    const result = (Array.isArray(data) ? data[0] : data) as
-      | { blocked?: boolean; warning?: string; message?: Msg }
-      | null;
+      if (error) {
+        setErr(error.message);
+        return;
+      }
 
-    if (result?.blocked) {
-      // Keep the text in the box so the sender can rewrite it.
-      setBlocked(result.warning ?? "This message was not sent.");
-      return;
-    }
+      const result = (Array.isArray(data) ? data[0] : data) as
+        | { blocked?: boolean; warning?: string; message?: Msg }
+        | null;
 
-    if (result?.message) {
-      const saved = result.message;
-      setMessages((prev) => (prev.some((m) => m.id === saved.id) ? prev : [...prev, saved]));
-      setText("");
-      // The message is out, so the other side's dots must go at once.
-      stopTyping();
+      if (result?.blocked) {
+        // Keep the text in the box so the sender can rewrite it.
+        setBlocked(result.warning ?? "This message was not sent.");
+        return;
+      }
 
-      /*
+      if (result?.message) {
+        const saved = result.message;
+        setMessages((prev) => (prev.some((m) => m.id === saved.id) ? prev : [...prev, saved]));
+        setText("");
+        // The message is out, so the other side's dots must go at once.
+        stopTyping();
+
+        /*
         ── AI reply trigger ──────────────────────────────────────────────
         The BUYER's message is what should wake the seller's AI: a
         seller who is offline cannot trigger anything, and the whole
@@ -481,6 +496,7 @@ export function ChatThread({
           });
       }
     }
+    });
   }
 
   /**
@@ -867,7 +883,7 @@ export function ChatThread({
             {o.scope && <p className="text-[12.5px] text-ink-600">Scope: {o.scope}</p>}
             {o.timeline && <p className="text-[12.5px] text-ink-600">Timeline: {o.timeline}</p>}
             <p className="mt-1.5 text-[11px] leading-relaxed text-ink-400">
-              Accepting creates an order. Pay NaijaMart by transfer — we hold it until you confirm the job is done.
+              Accepting creates an order. Pay Jova by transfer — we hold it until you confirm the job is done.
             </p>
             {!amSeller && o.status === "pending" && (
               <button onClick={() => acceptOffer(o.id)} disabled={busy} className="nm-btn-primary mt-2 w-full !py-2">

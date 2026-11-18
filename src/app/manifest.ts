@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 /**
- * Web app manifest — this is what makes NaijaMart installable from Chrome.
+ * Web app manifest — this is what makes Jova installable from Chrome.
  *
  * Chrome's install criteria, all satisfied here:
  *   * `name` (or `short_name`) present
@@ -23,8 +23,8 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "NaijaMart — buy and hire from verified sellers",
-    short_name: "NaijaMart",
+    name: "Jova Marketplace — buy and hire from verified sellers",
+    short_name: "Jova",
     description:
       "A Nigerian marketplace for goods and services. Your money is held in escrow until you confirm delivery.",
     start_url: "/",

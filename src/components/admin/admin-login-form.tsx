@@ -62,7 +62,7 @@ export function AdminLoginForm() {
           className="nm-input"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@naijamart.com"
+          placeholder="you@jova.com"
         />
       </div>
 

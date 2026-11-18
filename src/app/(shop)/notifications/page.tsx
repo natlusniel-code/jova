@@ -132,7 +132,7 @@ export default async function NotificationsPage() {
           <EmptyState
             icon="🔔"
             title="No notifications yet"
-            body="When you place an order you'll be told at every step — payment confirmed, accepted, shipped, delivered. Announcements from NaijaMart show up here too."
+            body="When you place an order you'll be told at every step — payment confirmed, accepted, shipped, delivered. Announcements from Jova show up here too."
             action="Start shopping"
             href="/"
           />

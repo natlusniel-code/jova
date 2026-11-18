@@ -8,7 +8,7 @@ export const metadata = { title: "Help & support" };
 const FAQ = [
   {
     q: "How does payment work?",
-    a: "NaijaMart holds your money in escrow. The seller is only paid after you confirm the item arrived as described. If it doesn't, raise an issue on the order and support steps in.",
+    a: "Jova holds your money in escrow. The seller is only paid after you confirm the item arrived as described. If it doesn't, raise an issue on the order and support steps in.",
   },
   {
     q: "How long does delivery take?",
@@ -16,11 +16,11 @@ const FAQ = [
   },
   {
     q: "Can I buy from a seller in another city?",
-    a: "Yes. The home page defaults to your city, but the location filter has an \"All cities\" option that shows every seller on NaijaMart.",
+    a: "Yes. The home page defaults to your city, but the location filter has an \"All cities\" option that shows every seller on Jova.",
   },
   {
     q: "How do I become a seller?",
-    a: "Create an account, choose \"Sell on NaijaMart\", and complete the four-step onboarding. You'll need a valid NIN or CAC number and your bank details for payouts.",
+    a: "Create an account, choose \"Sell on Jova\", and complete the four-step onboarding. You'll need a valid NIN or CAC number and your bank details for payouts.",
   },
   {
     q: "My order never arrived. What now?",
@@ -44,7 +44,7 @@ export default function HelpPage() {
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <a
-            href={supportWhatsAppUrl("Hi NaijaMart support, I need help with...")}
+            href={supportWhatsAppUrl("Hi Jova support, I need help with...")}
             target="_blank"
             rel="noreferrer noopener"
             className="nm-btn-primary nm-btn-sm"

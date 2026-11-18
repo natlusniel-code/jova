@@ -10,9 +10,8 @@ import { cn } from "@/lib/utils";
  * The storefront header — reference 1.
  *
  * ── Layout ──────────────────────────────────────────────────────────────
- * Row one: the brand mark (a deep-green rounded square holding a white
- * cart glyph), the wordmark with "Naija" in black and "Mart" in green,
- * then the right-hand cluster — bell, cart, avatar.
+ * Row one: the Jova lockup (the cart-and-star mark with the wordmark), then
+ * the right-hand cluster — bell, cart, avatar.
  *
  * Row two: the location pills. They are real links to the location
  * picker, so the header is also the way to change where you are
@@ -95,27 +94,23 @@ export function ShopHeader({
       <div className="mx-auto w-full max-w-7xl px-4 pb-2.5 pt-3 sm:px-6">
         {/* ── Row one ─────────────────────────────────────────────────── */}
         <div className="flex min-w-0 items-center gap-3">
-          <Link href="/" className="flex min-w-0 shrink items-center gap-2.5" aria-label="NaijaMart home">
-            <span className="nm-head-mark shrink-0">
-              <svg
-                viewBox="0 0 24 24"
-                className="h-[22px] w-[22px]"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M3 4h2.2l2.1 10.4a1.6 1.6 0 0 0 1.6 1.3h8.3a1.6 1.6 0 0 0 1.6-1.3L20.5 7H6" />
-                <circle cx="9.5" cy="19.5" r="1.4" />
-                <circle cx="17.5" cy="19.5" r="1.4" />
-              </svg>
-            </span>
-            <span className="truncate font-display text-[21px] font-extrabold leading-none tracking-[-0.035em]">
-              <span className="text-[#0b0f0f]">Naija</span>
-              <span className="font-semibold text-[#006747]">Mart</span>
-            </span>
+          <Link href="/" className="flex min-w-0 shrink items-center" aria-label="Jova Marketplace home">
+            {/* The Jova lockup. The mark alone on a narrow phone, where the
+                wordmark would be squeezed against the icon cluster. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/jova-logo.png"
+              alt="Jova Marketplace"
+              className="hidden h-[27px] w-auto select-none sm:block"
+              draggable={false}
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/jova-mark.png"
+              alt="Jova Marketplace"
+              className="h-8 w-auto select-none sm:hidden"
+              draggable={false}
+            />
           </Link>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">

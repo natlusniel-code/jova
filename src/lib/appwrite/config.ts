@@ -27,7 +27,7 @@ export const APPWRITE_PROJECT_ID =
   process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || "6af94f00001c084b1bdf";
 
 export const APPWRITE_PROJECT_NAME =
-  process.env.NEXT_PUBLIC_APPWRITE_PROJECT_NAME || "NaijaMart";
+  process.env.NEXT_PUBLIC_APPWRITE_PROJECT_NAME || "Jova";
 
 /** True when both values resolved to something non-empty. */
 export const APPWRITE_CONFIGURED = Boolean(APPWRITE_ENDPOINT && APPWRITE_PROJECT_ID);

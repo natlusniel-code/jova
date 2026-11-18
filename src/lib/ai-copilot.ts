@@ -299,7 +299,7 @@ function planPrompt(question: string, schema: SchemaSnapshot | null, history: st
     ? `\nThe live database (every table and column, read from the database just now):\n${describeSchema(schema)}\n`
     : "";
 
-  return `You are the copilot for the admin of NaijaMart, a Nigerian marketplace. You answer from the live database.
+  return `You are the copilot for the admin of Jova, a Nigerian marketplace. You answer from the live database.
 
 NAMED QUERIES (prefer these when one fits — they encode business rules):
 ${named}
@@ -494,7 +494,7 @@ export async function askCopilot(
     if (failed.length && failed.length === results.length) {
       const repair = await aiTry(() =>
         aiJson<{ queries?: QuerySpec[] }>({
-          prompt: `You are the copilot for the admin of NaijaMart. Your previous query was rejected.
+          prompt: `You are the copilot for the admin of Jova. Your previous query was rejected.
 
 The admin asked: "${q}"
 
@@ -544,7 +544,7 @@ How to correct it:
   // ── 3. Write the answer ─────────────────────────────────────────────────
   const answer = await aiTry(() =>
     aiText({
-      prompt: `You are the copilot for the admin of NaijaMart, a Nigerian marketplace.
+      prompt: `You are the copilot for the admin of Jova, a Nigerian marketplace.
 
 The admin asked: "${q}"
 

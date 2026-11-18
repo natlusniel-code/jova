@@ -106,7 +106,7 @@ export async function getRecommendations(
 
   // ── Ask the model to order them ──────────────────────────────────────
   const ranked = await aiTry(async () => {
-    const prompt = `You are a recommendation engine for NaijaMart, a Nigerian marketplace.
+    const prompt = `You are a recommendation engine for Jova, a Nigerian marketplace.
 
 Buyer context:
 - Location: ${[signals.city, signals.state].filter(Boolean).join(", ") || "unknown"}

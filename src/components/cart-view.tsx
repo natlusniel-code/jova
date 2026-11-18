@@ -98,7 +98,7 @@ export function CartView() {
               Proceed to checkout
             </Link>
             <p className="mt-2 text-center text-[11.5px] leading-relaxed text-ink-400">
-              You pay NaijaMart by bank transfer. We hold it until you confirm delivery.
+              You pay Jova by bank transfer. We hold it until you confirm delivery.
             </p>
           </>
         )}

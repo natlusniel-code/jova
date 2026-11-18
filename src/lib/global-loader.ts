@@ -103,6 +103,21 @@ const listeners = new Set<(s: LoaderState) => void>();
 type PendingEntry = { kind: LoadKind; at: number };
 const pending = new Map<string, PendingEntry>();
 
+/**
+ * How many callers have asked the loader to stay quiet.
+ *
+ * ── Why this exists ───────────────────────────────────────────────────
+ * A chat message must not raise the loader. The buyer sends, the bubble is
+ * on screen, and they keep typing — if a spinning star appeared over the
+ * thread on every send, the chat would look like it was reloading each time
+ * and the thread would be unreadable while the other person replies.
+ *
+ * It is a counter, not a boolean: a send and its image upload overlap, and
+ * the second one releasing must not un-mute the first. Only the last release
+ * brings the loader back.
+ */
+let muteDepth = 0;
+
 let showTimer: ReturnType<typeof setTimeout> | null = null;
 let minVisibleUntil = 0;
 let hideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -204,6 +219,11 @@ function showNow(label: string, blocking: boolean) {
  */
 export function startLoading(kind: LoadKind, label = "Loading..."): string {
   sweepStale();
+
+  // Muted while a message is being sent. A token is still returned so the
+  // caller's matching `stopLoading` stays valid and symmetric — it simply
+  // has nothing to stop.
+  if (muteDepth > 0) return `${kind}:muted:${++seq}`;
 
   const token = `${kind}:${++seq}`;
 
@@ -331,6 +351,35 @@ export function resetLoader() {
   pending.clear();
   state = INITIAL;
   listeners.forEach((l) => l(state));
+}
+
+/**
+ * Silence the loader for the duration of `fn`, then restore it.
+ *
+ * Used by the chat composer: sending a message is a write whose result the
+ * sender already sees optimistically, so a global "loading" star over the
+ * thread is noise, not feedback. The composer has its own in-bubble pending
+ * state for that — which is the right place for it, because it points at the
+ * one message that is in flight instead of at the whole screen.
+ *
+ * Implemented as a depth counter so overlapping sends (a message plus its
+ * image upload) do not un-mute each other. The `finally` guarantees the
+ * counter unwinds even when the write throws.
+ *
+ *   await withLoaderMuted(async () => { ...send... });
+ */
+export async function withLoaderMuted<T>(fn: () => Promise<T> | T): Promise<T> {
+  muteDepth += 1;
+  try {
+    return await fn();
+  } finally {
+    muteDepth = Math.max(0, muteDepth - 1);
+  }
+}
+
+/** True while something has asked the loader to stay quiet. */
+export function isLoaderMuted(): boolean {
+  return muteDepth > 0;
 }
 
 /**

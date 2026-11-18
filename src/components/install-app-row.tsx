@@ -103,7 +103,7 @@ export function InstallAppRow() {
         <div className="min-w-0">
           <p className="text-[13.5px] font-semibold text-ink-900">Install app</p>
           <p className="text-[11.5px] text-ink-500">
-            Add NaijaMart to your home screen for one-tap access
+            Add Jova to your home screen for one-tap access
           </p>
         </div>
         <button
@@ -130,7 +130,7 @@ export function InstallAppRow() {
           </p>
           <p className="mt-1">
             <span className="font-semibold">Desktop Chrome:</span> the install icon in the address bar,
-            or ⋮ menu → <span className="font-semibold">Install NaijaMart</span>.
+            or ⋮ menu → <span className="font-semibold">Install Jova</span>.
           </p>
         </div>
       )}

@@ -45,7 +45,7 @@ export function LoginGlassPanel({
           Welcome back
         </h2>
         <p className="mt-2 text-[13.5px] leading-relaxed text-ink-500">
-          Sign in with the Google account you used to join NaijaMart.
+          Sign in with the Google account you used to join Jova.
         </p>
       </div>
 
@@ -65,7 +65,7 @@ export function LoginGlassPanel({
         <div className="mb-5 rounded-[16px] border border-[#f2d9a8] bg-[#fdf7ec] px-4 py-4">
           <p className="text-[13.5px] font-bold text-[#7a4f08]">You don&apos;t have an account yet</p>
           <p className="mt-1.5 text-[12.5px] leading-relaxed text-[#8a5a0b]">
-            There is no NaijaMart account for that Google address. Create one first — it takes one
+            There is no Jova account for that Google address. Create one first — it takes one
             tap.
           </p>
           <Link href="/signup" className="nm-btn-primary mt-3.5 w-full">
@@ -98,7 +98,7 @@ export function LoginGlassPanel({
       </div>
 
       <p className="text-center text-[13px] text-ink-500">
-        New to NaijaMart?{" "}
+        New to Jova?{" "}
         <Link href="/signup" className="font-bold text-brand-600 hover:underline">
           Create an account
         </Link>

@@ -139,7 +139,7 @@ export function buildPrompt({
     .join("\n");
 
   if (kind === "service") {
-    return `You are an expert marketplace copywriter and graphic designer. You are writing a listing for a SERVICE (a gig) on NaijaMart, a Nigerian marketplace. The seller may have supplied only a title, or a title plus a short description of the service, and may or may not have attached photos.
+    return `You are an expert marketplace copywriter and graphic designer. You are writing a listing for a SERVICE (a gig) on Jova, a Nigerian marketplace. The seller may have supplied only a title, or a title plus a short description of the service, and may or may not have attached photos.
 
 Return ONLY valid JSON in exactly this shape:
 ${shape}
@@ -162,7 +162,7 @@ ${landscape}
 ${sellerInput}`;
   }
 
-  return `You are an expert ecommerce copywriter. You are writing a listing for a PRODUCT on NaijaMart, a Nigerian marketplace. You are given the seller's title, an optional description, and optionally several photos of the same product. Use ALL the photos together to understand the product accurately — its shape, material, colour, size, details and finish. The seller's description is the source of truth for facts you cannot see. Then return ONLY valid JSON in exactly this shape:
+  return `You are an expert ecommerce copywriter. You are writing a listing for a PRODUCT on Jova, a Nigerian marketplace. You are given the seller's title, an optional description, and optionally several photos of the same product. Use ALL the photos together to understand the product accurately — its shape, material, colour, size, details and finish. The seller's description is the source of truth for facts you cannot see. Then return ONLY valid JSON in exactly this shape:
 ${shape}
 
 Each banner prompt must describe the product accurately using what you saw in the photos (or the title and description when there are none), and must specify: subject, background, lighting, composition, aspect ratio, and where empty space is left for text. Do not invent facts that are not visible in the photos or stated in the seller's description.

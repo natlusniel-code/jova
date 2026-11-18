@@ -1,6 +1,6 @@
-# Naijamart — Remove Pollinations from the AI listing feature
+# Jova — Remove Pollinations from the AI listing feature
 
-**Repo:** `natlusniel-code/naijamart-marketplace` · base commit `3f69ae9` (branch `main`)
+**Repo:** `natlusniel-code/jova-marketplace` · base commit `3f69ae9` (branch `main`)
 **Scope:** the AI listing feature only. Nothing else in the app was touched.
 
 ## What changed

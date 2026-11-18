@@ -320,7 +320,7 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
                     <div className="min-w-0 flex-1">
                       <p className="line-clamp-1 text-[11.5px] font-semibold text-ink-900">{l.title}</p>
                       <p className="mt-0.5 text-[10.5px] text-ink-400">
-                        {placeLabel(l.shops) ?? "NaijaMart"}
+                        {placeLabel(l.shops) ?? "Jova"}
                       </p>
                     </div>
                     <p className="shrink-0 font-display text-[12.5px] font-extrabold text-ink-900">
@@ -505,7 +505,7 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
           </span>
           <h2 className="mt-3 text-[23px] sm:text-[26px]">Your money moves only when you say so</h2>
           <p className="mt-2 text-[13.5px] leading-relaxed text-ink-500">
-            Every order on NaijaMart runs through escrow. The seller never holds your money before
+            Every order on Jova runs through escrow. The seller never holds your money before
             you have the goods in hand.
           </p>
         </div>
@@ -515,7 +515,7 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
             {
               n: "01",
               t: "Pay into escrow",
-              d: "You transfer to NaijaMart's admin account — never directly to the seller.",
+              d: "You transfer to Jova's admin account — never directly to the seller.",
             },
             {
               n: "02",

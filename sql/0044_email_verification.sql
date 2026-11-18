@@ -1,5 +1,5 @@
 -- =====================================================================
--- NaijaMart — 0044 Email verification by link
+-- Jova — 0044 Email verification by link
 -- =====================================================================
 -- Replaces the old "retype the code shown on screen" method. That method
 -- proved nothing: the code was displayed to whoever was already at the

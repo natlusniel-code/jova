@@ -205,7 +205,7 @@ export function CheckoutFlow({
       return;
     }
     if (!agreed) {
-      setErr("Please accept the NaijaMart Marketplace Policy and the payment terms to continue.");
+      setErr("Please accept the Jova Marketplace Policy and the payment terms to continue.");
       return;
     }
     for (const s of shops) {
@@ -522,7 +522,7 @@ export function CheckoutFlow({
               ) : (
                 <>
                   <div className="mx-4 mb-3 rounded-xl border border-brand-500/25 bg-brand-50/60 p-3">
-                    <p className="text-[12px] font-bold text-brand-900">Pay NaijaMart (escrow account)</p>
+                    <p className="text-[12px] font-bold text-brand-900">Pay Jova (escrow account)</p>
                     {account ? (
                       <>
                         <dl className="mt-1.5 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5 text-[12.5px]">
@@ -634,7 +634,7 @@ export function CheckoutFlow({
           <span className="text-[11.5px] leading-relaxed text-ink-600">
             I have read and accept the{" "}
             <Link href="/legal" className="font-semibold text-brand-600 underline">
-              NaijaMart Marketplace Policy
+              Jova Marketplace Policy
             </Link>
             , including the Buyer Policy, Payments and Escrow, and Orders, Delivery, Cancellation and
             Returns sections. I confirm the details of this order are correct and that I will keep

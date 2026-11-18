@@ -17,6 +17,8 @@
  * groundwork for true background push is in place but needs a VAPID key.
  */
 
+import { notificationIcons } from "./notification-icons";
+
 const SW_PATH = "/sw.js";
 
 export function notificationsSupported(): boolean {
@@ -82,12 +84,18 @@ export async function showBrowserNotification(payload: {
 }): Promise<boolean> {
   if (!notificationsSupported() || Notification.permission !== "granted") return false;
 
+  // The phone's theme decides which silhouette is visible in the status bar;
+  // the plate icon is the same in both. See src/lib/notification-icons.ts.
+  const icons = notificationIcons();
+
   const data = {
     title: payload.title,
     body: payload.body ?? "",
     url: payload.url ?? "/notifications",
     tag: payload.tag,
     kind: payload.kind,
+    icon: icons.icon,
+    badge: icons.badge,
   };
 
   try {
@@ -101,10 +109,10 @@ export async function showBrowserNotification(payload: {
       }
       await reg.showNotification(data.title, {
         body: data.body,
-        // The green cart on transparency — the app tile rendered as a white
-        // square in the notification tray.
-        icon: "/notification-icon-192.png",
-        badge: "/notification-icon-96.png",
+        // The plate icon reads on a light and a dark shade; the badge is the
+        // silhouette that contrasts with the phone's current theme.
+        icon: icons.icon,
+        badge: icons.badge,
         data: { url: data.url, kind: data.kind },
         tag: data.tag,
       });
@@ -117,7 +125,8 @@ export async function showBrowserNotification(payload: {
   try {
     new Notification(data.title, {
       body: data.body,
-      icon: "/notification-icon-192.png",
+      icon: icons.icon,
+      badge: icons.badge,
     });
     return true;
   } catch {

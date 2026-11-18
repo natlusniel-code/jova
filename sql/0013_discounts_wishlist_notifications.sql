@@ -180,7 +180,7 @@ begin
       v_body  := format('%s was marked delivered. Confirm you received it so the seller gets paid.', new.reference);
     when 'completed' then
       v_title := 'Order completed';
-      v_body  := format('%s is complete. Thanks for shopping on NaijaMart.', new.reference);
+      v_body  := format('%s is complete. Thanks for shopping on Jova.', new.reference);
     when 'cancelled' then
       v_title := 'Order cancelled';
       v_body  := coalesce(new.decline_reason, format('%s was cancelled. Any payment is refunded to your transfer account.', new.reference));

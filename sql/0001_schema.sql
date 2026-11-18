@@ -1,5 +1,5 @@
 -- =====================================================================
--- NaijaMart — 0001 schema
+-- Jova — 0001 schema
 -- Paste this file into Supabase → SQL Editor → Run.
 -- No extensions beyond pgcrypto (already enabled on Supabase).
 -- =====================================================================
@@ -92,7 +92,7 @@ create table if not exists public.platform_settings (
   bank_account_number     text not null default '9111356510',
   bank_account_name       text not null default 'Anifowose Mutiu Ayinde',
   support_whatsapp        text not null default '2348012345678',
-  terms_text              text not null default 'NaijaMart holds every payment in escrow until the buyer confirms delivery. Refunds are issued if an order is not delivered.',
+  terms_text              text not null default 'Jova holds every payment in escrow until the buyer confirms delivery. Refunds are issued if an order is not delivered.',
   updated_at              timestamptz not null default now()
 );
 insert into public.platform_settings (id) values (1) on conflict (id) do nothing;

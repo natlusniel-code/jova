@@ -13,6 +13,19 @@ import { cn } from "@/lib/utils";
    ===================================================================== */
 
 /* ------------------------------------------------------------------ Logo */
+/**
+ * The Jova lockup — the cart-and-star mark with the wordmark beside it.
+ *
+ * ── Why an image and not type ─────────────────────────────────────────
+ * The wordmark is drawn artwork, not a font: the letterforms, the tapering
+ * underline and the star inside the cart are one piece of design. Rebuilding
+ * it from a webfont would drift from the brand the moment the font failed to
+ * load, so the lockup ships as two PNGs — the green original for light
+ * surfaces and a white cut for the dark auth panel and footer.
+ *
+ * `compact` drops the wordmark and shows the mark alone, for the places that
+ * only have room for a square (the mobile header, the tab bar).
+ */
 export function Logo({
   compact = false,
   light = false,
@@ -22,40 +35,28 @@ export function Logo({
   light?: boolean;
   className?: string;
 }) {
+  const src = compact
+    ? "/jova-mark.png"
+    : light
+      ? "/jova-logo-white.png"
+      : "/jova-logo.png";
+
   return (
-    <Link href="/" className={cn("inline-flex items-center gap-2.5", className)}>
-      <span
-        className="grid h-9 w-9 place-items-center rounded-[11px] text-white"
-        style={{
-          background: "linear-gradient(145deg,#0e8c4f,#064e2c)",
-          boxShadow: "0 4px 12px -2px rgba(6,78,44,.45)",
-        }}
-      >
-        <svg
-          viewBox="0 0 24 24"
-          className="h-[19px] w-[19px]"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2.1}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M3 7h14l-1.5 9H5.2L3 7Z" />
-          <path d="M17 7V5H19" />
-          <circle cx="7" cy="19" r="1.4" />
-          <circle cx="15" cy="19" r="1.4" />
-        </svg>
-      </span>
-      {!compact && (
-        <span
-          className={cn(
-            "font-display text-[19px] font-extrabold tracking-[-0.04em]",
-            light ? "text-white" : "text-ink-900",
-          )}
-        >
-          Naija<span className={light ? "text-lime" : "text-brand-500"}>Mart</span>
-        </span>
-      )}
+    <Link
+      href="/"
+      aria-label="Jova Marketplace home"
+      className={cn("inline-flex items-center", className)}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt="Jova Marketplace"
+        className={cn(
+          "w-auto select-none",
+          compact ? "h-9" : "h-[26px] sm:h-[28px]",
+        )}
+        draggable={false}
+      />
     </Link>
   );
 }

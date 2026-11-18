@@ -4,16 +4,16 @@
  * ── The problem this solves ────────────────────────────────────────────
  * Every push used to arrive with whatever `notifications.title` happened to
  * hold, and the OS showed it with no indication of its origin. A buyer could
- * not tell a message from another person apart from a NaijaMart system
+ * not tell a message from another person apart from a Jova system
  * announcement or an order update — they all looked like the same app talking.
  *
  * So a notification now carries a SOURCE, and the source decides the title:
  *
  *   chat       → "Message from Ada"        (the sender's name)
  *   order      → "Order update"
- *   broadcast  → "NaijaMart"
- *   system     → "NaijaMart"
- *   promo      → "NaijaMart offer"
+ *   broadcast  → "Jova"
+ *   system     → "Jova"
+ *   promo      → "Jova offer"
  *
  * ── Why the mapping lives here ─────────────────────────────────────────
  * The same rule has to hold in two places: the server that builds the push
@@ -43,27 +43,27 @@ export const NOTIFICATION_SOURCES: Record<NotificationKind, NotificationSource> 
   },
   order: {
     label: "Order update",
-    subtitle: "NaijaMart orders",
+    subtitle: "Jova orders",
     href: "/orders",
   },
   broadcast: {
-    label: "NaijaMart",
+    label: "Jova",
     subtitle: "Announcement",
     href: "/notifications",
   },
   system: {
-    label: "NaijaMart",
+    label: "Jova",
     subtitle: "Account notice",
     href: "/notifications",
   },
   promo: {
-    label: "NaijaMart offer",
+    label: "Jova offer",
     subtitle: "Deals and discounts",
     href: "/notifications",
   },
 };
 
-/** Anything unrecognised is treated as a NaijaMart system notice. */
+/** Anything unrecognised is treated as a Jova system notice. */
 export function sourceFor(kind: string | null | undefined): NotificationSource {
   return NOTIFICATION_SOURCES[(kind ?? "system") as NotificationKind] ?? NOTIFICATION_SOURCES.system;
 }
@@ -89,7 +89,7 @@ export function notificationTitle(kind: string | null | undefined, rawTitle: str
   }
 
   // A system/broadcast row whose title already starts with the brand would
-  // read "NaijaMart — NaijaMart: ..." if we prefixed it blindly.
+  // read "Jova — Jova: ..." if we prefixed it blindly.
   if (subject && subject.toLowerCase().startsWith(src.label.toLowerCase())) return subject;
 
   return subject ? `${src.label} — ${subject}` : src.label;

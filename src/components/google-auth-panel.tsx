@@ -35,7 +35,7 @@ const ROLES: { key: Role; title: string; body: string; icon: React.ReactNode }[]
 ];
 
 /**
- * The one and only way into NaijaMart.
+ * The one and only way into Jova.
  *
  * ── Why there is no form ────────────────────────────────────────────────────
  * Email sign-up, email sign-in, the 6-digit verification code and the
@@ -74,7 +74,7 @@ export function GoogleAuthPanel({
   return (
     <div>
       <h1 className="text-[27px] font-extrabold leading-tight tracking-tight text-ink-900">
-        Welcome to NaijaMart
+        Welcome to Jova
       </h1>
       <p className="mt-1.5 text-[14px] leading-relaxed text-ink-500">
         One tap with Google and you&apos;re in — no password to create or

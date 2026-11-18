@@ -3,6 +3,7 @@ import { createAdminClient } from "./supabase/admin";
 import { webPushConfigOrNull, type WebPushConfig } from "./push-private";
 import { sendPush, type PushTarget } from "./webpush";
 import { notificationTitle, notificationBody, sourceFor } from "./notification-source";
+import { NOTIFICATION_ICON } from "./notification-icons";
 
 /* Server-side Web Push dispatch.
  *
@@ -106,7 +107,7 @@ export async function dispatchPush(limit = 50): Promise<DispatchResult> {
     if (!targets.length) continue; // no device registered — nothing to do
 
     // The title names WHERE the notification came from — "Message from Ada",
-    // "Order update — ...", "NaijaMart — ..." — instead of showing the raw
+    // "Order update — ...", "Jova — ..." — instead of showing the raw
     // row title with no origin. See src/lib/notification-source.ts.
     const payload = {
       title: notificationTitle(row.kind, row.title),
@@ -114,11 +115,12 @@ export async function dispatchPush(limit = 50): Promise<DispatchResult> {
       url: row.href ?? sourceFor(row.kind).href,
       tag: row.id,
       kind: row.kind,
-      // The green cart on transparency, not the full app tile: a push icon is
-      // drawn on the OS's own background, so a tile would show as a white
-      // square (which is exactly the bug that was reported).
-      icon: "/notification-icon-192.png",
-      badge: "/notification-icon-96.png",
+      // The plate icon, which reads on a light and on a dark shade. A push
+      // sent from here has no idea what theme the receiving phone is in, so
+      // it must not guess — the client overrides the badge with the
+      // contrasting silhouette when it displays the notification itself.
+      icon: NOTIFICATION_ICON,
+      badge: "/notification-icon-white.png",
     };
 
     let rowSent = 0;

@@ -1,5 +1,5 @@
 -- =====================================================================
--- 0015 — NaijaMart's own sign-in
+-- 0015 — Jova's own sign-in
 --
 -- Supabase Auth is no longer the thing that decides whether a password is
 -- correct. This file adds the app's own credential store, and the app mints a

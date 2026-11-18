@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { POLICY_EFFECTIVE_DATE, POLICY_LAST_UPDATED } from "../policy-content";
 
-export const metadata = { title: "Seller Agreement — NaijaMart" };
+export const metadata = { title: "Seller Agreement — Jova" };
 
 export default function SellerAgreementPage() {
   return (
@@ -15,7 +15,7 @@ export default function SellerAgreementPage() {
         <p>
           This Seller Agreement forms part of the{" "}
           <Link href="/legal" className="font-semibold text-brand-600 hover:underline">
-            NaijaMart Marketplace Policy
+            Jova Marketplace Policy
           </Link>
           . Section 3 (Seller Policy) and Section 9 (Fees, Taxes and Payouts) apply in full.
         </p>
@@ -49,7 +49,7 @@ export default function SellerAgreementPage() {
         <section>
           <h2 className="text-[15px] font-bold text-ink-900">Suspension</h2>
           <p className="mt-1">
-            NaijaMart may suspend or remove listings and accounts that violate policy. Pending
+            Jova may suspend or remove listings and accounts that violate policy. Pending
             orders, refunds, disputes and lawful obligations may continue after suspension.
           </p>
         </section>

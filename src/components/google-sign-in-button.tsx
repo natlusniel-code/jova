@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
  * The four brand colours need a light background to stay legible. On the
  * brand-green button they would clash and the red would disappear. A white
  * chip inside the green button keeps the mark correct and the button still
- * reads as NaijaMart's primary action — same green, same radius, same type as
+ * reads as Jova's primary action — same green, same radius, same type as
  * every other primary button on the site.
  *
  * ── Why there is no redirect here ─────────────────────────────────────────

@@ -1,5 +1,5 @@
 -- =====================================================================
--- NaijaMart — demo seed (safe to re-run)
+-- Jova — demo seed (safe to re-run)
 --
 -- Shops and listings are inserted with owner_id = null and is_demo = true
 -- so they exist without any auth user. Claim one by running:

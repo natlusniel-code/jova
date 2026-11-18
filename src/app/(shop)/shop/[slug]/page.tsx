@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
  *
  * When a seller pastes their shop link into WhatsApp, Instagram, X or
  * Telegram, the unfurler reads these tags. Without them every shop shared the
- * same generic NaijaMart card, so a buyer had no idea who they were about to
+ * same generic Jova card, so a buyer had no idea who they were about to
  * open. Now the card carries the shop's own banner as the image and its bio as
  * the description.
  *
@@ -46,9 +46,9 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       ? rawBio.length > 160
         ? `${rawBio.slice(0, 157).trimEnd()}…`
         : rawBio
-      : `${shop.name} on NaijaMart — ${shop.kind === "services" ? "services" : "goods"} from ${shop.city}, ${shop.state}. Pay through escrow.`;
+      : `${shop.name} on Jova — ${shop.kind === "services" ? "services" : "goods"} from ${shop.city}, ${shop.state}. Pay through escrow.`;
 
-  const title = `${shop.name}${shop.verified ? " ✓" : ""} · NaijaMart`;
+  const title = `${shop.name}${shop.verified ? " ✓" : ""} · Jova`;
   const url = `/shop/${shop.slug}`;
 
   // Open Graph consumers require an ABSOLUTE url. Next only absolutises it when
@@ -70,7 +70,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       title,
       description: bio,
       url: absoluteUrl,
-      siteName: "NaijaMart",
+      siteName: "Jova",
       images: image ? [{ url: image, alt: `${shop.name} banner` }] : undefined,
     },
     twitter: {

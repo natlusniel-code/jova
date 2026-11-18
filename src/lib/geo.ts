@@ -98,7 +98,7 @@ export function addressUrl(address: string) {
  * tight enough that the pin is not a dot in a city-wide view.
  *
  * No key, no SDK, no Google. The iframe is sandboxed by the browser and the
- * coordinates are in the URL only, never in a request to NaijaMart.
+ * coordinates are in the URL only, never in a request to Jova.
  */
 export function osmEmbedUrl(c: Coords, span = 0.008) {
   const west = (c.lng - span).toFixed(5);

@@ -20,7 +20,7 @@ export default function NotFound() {
         </Link>
       </div>
       <a
-        href={supportWhatsAppUrl("Hi NaijaMart support, I need help with...")}
+        href={supportWhatsAppUrl("Hi Jova support, I need help with...")}
         target="_blank"
         rel="noreferrer noopener"
         className="mt-4 text-[12.5px] font-semibold text-brand-600 hover:underline"

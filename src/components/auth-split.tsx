@@ -14,7 +14,7 @@ const BULLETS = [
   },
   {
     title: "We hold your money until you confirm delivery",
-    body: "You transfer to NaijaMart, not to the seller. We release the money after you confirm.",
+    body: "You transfer to Jova, not to the seller. We release the money after you confirm.",
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
         <rect x="3.5" y="6.5" width="17" height="12" rx="2.5" />

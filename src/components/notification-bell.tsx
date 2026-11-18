@@ -104,7 +104,7 @@ export function NotificationBell({
             // for something they are reading.
             if (!onNotificationsPage && notificationPermission() === "granted") {
               // Name the source in the title — "Message from Ada", "Order
-              // update — ...", "NaijaMart — ..." — so the OS popup says where
+              // update — ...", "Jova — ..." — so the OS popup says where
               // it came from instead of showing a bare subject line.
               void showBrowserNotification({
                 title: notificationTitle(row.kind, row.title),

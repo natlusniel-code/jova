@@ -1,9 +1,9 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "NaijaMart Marketplace Policy",
+  title: "Jova Marketplace Policy",
   description:
-    "The NaijaMart Marketplace Policy: buyer and seller rules, payments and escrow, orders, delivery, returns, disputes, privacy and more.",
+    "The Jova Marketplace Policy: buyer and seller rules, payments and escrow, orders, delivery, returns, disputes, privacy and more.",
 };
 
 const NAV = [

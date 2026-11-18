@@ -54,7 +54,7 @@ export default async function AdminOrdersPage({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-[22px] font-extrabold tracking-tight text-ink-900">Orders ledger</h1>
-        <CsvExport rows={csvRows} filename="naijamart-orders.csv" />
+        <CsvExport rows={csvRows} filename="jova-orders.csv" />
       </div>
 
       <div className="grid grid-cols-3 gap-2.5">

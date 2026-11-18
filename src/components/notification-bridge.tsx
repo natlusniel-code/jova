@@ -59,7 +59,7 @@ export function NotificationBridge() {
             // row the user is already looking at is noise.
             if (window.location.pathname.startsWith("/notifications")) return;
             // Name the source, exactly as the server push does — "Message
-            // from Ada", "Order update — ...", "NaijaMart — ...". Without
+            // from Ada", "Order update — ...", "Jova — ...". Without
             // this the in-tab popup and the closed-app push would present the
             // same notification differently.
             void showBrowserNotification({

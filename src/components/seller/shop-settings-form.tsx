@@ -133,7 +133,7 @@ export function ShopSettingsForm({ shop }: { shop: any }) {
           </div>
           <p className="mt-0.5 text-[12px] text-ink-600">{shop.city}, {shop.state}</p>
           <p className="mt-1 text-[11px] leading-relaxed text-ink-400">
-            Changing your city needs a NaijaMart review because it changes who can order from you. Message support to request a change.
+            Changing your city needs a Jova review because it changes who can order from you. Message support to request a change.
           </p>
         </div>
       </Card>

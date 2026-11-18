@@ -997,7 +997,7 @@ export function ListingForm({
           )}
 
           <div className="rounded-xl bg-slate-50 px-3 py-2 text-[11.5px] leading-relaxed text-ink-500">
-            NaijaMart takes {". "}5% commission on each order. Buyers pay {form.price ? naira(Number(form.price)) : "your price"} plus any delivery — you receive{" "}
+            Jova takes {". "}5% commission on each order. Buyers pay {form.price ? naira(Number(form.price)) : "your price"} plus any delivery — you receive{" "}
             {form.price ? naira(Math.round(Number(form.price) * 0.95)) : "95%"} of the item price after delivery is confirmed.
           </div>
         </div>

@@ -1,4 +1,4 @@
-# NaijaMart — category filter, tag search, ranked storefront
+# Jova — category filter, tag search, ranked storefront
 
 Fixes the three reported bugs. The database does the filtering, matching and
 ranking; the app calls it.

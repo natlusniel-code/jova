@@ -1,5 +1,5 @@
 -- =====================================================================
--- NaijaMart — 0045 Allow the 'verify' purpose
+-- Jova — 0045 Allow the 'verify' purpose
 -- =====================================================================
 -- `one_time_codes_purpose_check` was written when the only purposes were
 -- 'signup' and 'reset'. The email-link flow needs a third, 'verify', and the

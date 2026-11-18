@@ -82,7 +82,7 @@ export function SignupPanel({
             You already have an account
           </p>
           <p className="mt-1 text-[12.5px] leading-relaxed text-amber-800">
-            That Google address is already registered with NaijaMart. Log in
+            That Google address is already registered with Jova. Log in
             instead to get back to your profile, orders and chats.
           </p>
           <Link href="/auth" className="nm-btn-primary mt-3 w-full !py-2.5 text-[14px]">

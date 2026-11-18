@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Tailwind theme for NaijaMart.
+ * Tailwind theme for Jova.
  *
  * The palette mirrors the CSS custom properties in `globals.css` so a
  * utility class and a `var(…​)` reference always resolve to the same

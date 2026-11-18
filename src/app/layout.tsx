@@ -18,12 +18,28 @@ import "./legacy-palette.css";
 import "./reference.css";
 
 export const metadata: Metadata = {
+  // `metadataBase` is what turns the relative OG image path below into the
+  // absolute URL that WhatsApp, X and Facebook require. Without it Next emits
+  // a relative `og:image` and every scraper silently drops the preview.
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || "https://naijamart-marketplace-opal.vercel.app",
+  ),
   title: {
-    default: "NaijaMart — buy and hire from verified sellers in your state",
-    template: "%s · NaijaMart",
+    default: "Jova Marketplace — buy and hire from verified sellers in your state",
+    template: "%s · Jova Marketplace",
   },
   description:
-    "NaijaMart is a Nigerian marketplace for goods and services. We hold your money in escrow until you confirm delivery.",
+    "Jova Marketplace is a Nigerian marketplace for goods and services. We hold your money in escrow until you confirm delivery.",
+  applicationName: "Jova Marketplace",
+  authors: [{ name: "Jova Marketplace" }],
+  keywords: [
+    "Jova",
+    "Jova Marketplace",
+    "Nigeria marketplace",
+    "buy and sell Nigeria",
+    "hire services Nigeria",
+    "escrow marketplace",
+  ],
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -34,13 +50,39 @@ export const metadata: Metadata = {
     shortcut: ["/favicon.ico"],
   },
   manifest: "/manifest.webmanifest",
-  applicationName: "NaijaMart",
   appleWebApp: {
     capable: true,
-    title: "NaijaMart",
+    title: "Jova",
     statusBarStyle: "default",
   },
   formatDetection: { telephone: false },
+  // ── Share card ────────────────────────────────────────────────────────
+  // One 1200×630 image for every surface. `summary_large_image` is what makes
+  // X draw it full width instead of as a thumbnail beside the text.
+  openGraph: {
+    type: "website",
+    siteName: "Jova Marketplace",
+    title: "Jova Marketplace — buy and hire from verified sellers",
+    description:
+      "Buy and hire from verified sellers in your state. Escrow-protected, so you pay only when you accept.",
+    url: "/",
+    locale: "en_NG",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Jova Marketplace — buy and hire from verified sellers in your state",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Jova Marketplace — buy and hire from verified sellers",
+    description:
+      "Buy and hire from verified sellers in your state. Escrow-protected, so you pay only when you accept.",
+    images: ["/og-image.jpg"],
+  },
 };
 
 export const viewport: Viewport = {

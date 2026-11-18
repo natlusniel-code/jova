@@ -15,7 +15,7 @@ import { createClient } from "@/lib/supabase/client";
  *
  * Instead there is ONE app-wide channel, `nm-presence`. Every signed-in
  * client tracks itself on it, so `presenceState()` is the set of people
- * who currently have NaijaMart open. That answers "online" for every row
+ * who currently have Jova open. That answers "online" for every row
  * at once, and it is honest: it means "has the app open right now", not
  * "read a message an hour ago".
  *

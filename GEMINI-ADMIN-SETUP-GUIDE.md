@@ -91,7 +91,7 @@ and must be switched off.
 ### 2.1 Open the project settings
 
 1. Go to **https://vercel.com/dashboard**
-2. Click on the **naijamart** project.
+2. Click on the **jova** project.
 3. Click the **"Settings"** tab at the top.
 4. In the left sidebar, click **"Environment Variables"**.
 

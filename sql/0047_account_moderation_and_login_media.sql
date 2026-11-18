@@ -1,5 +1,5 @@
 -- =====================================================================
--- NaijaMart — 0047 Account moderation + admin-editable login media
+-- Jova — 0047 Account moderation + admin-editable login media
 --
 -- Two problems this closes.
 --

@@ -385,7 +385,7 @@ export default async function ProfilePage() {
       <InstallAppRow />
 
       <p className="pb-2 text-center text-[11px] text-ink-400">
-        Signed in as {p.email} · NaijaMart holds all payments in escrow.
+        Signed in as {p.email} · Jova holds all payments in escrow.
       </p>
     </div>
   );

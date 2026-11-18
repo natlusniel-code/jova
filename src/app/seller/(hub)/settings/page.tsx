@@ -64,7 +64,7 @@ export default async function ShopSettingsPage() {
         </div>
         {shop.review_note && (
           <div className="mt-2.5">
-            <Alert tone="amber" title="Note from NaijaMart">{shop.review_note}</Alert>
+            <Alert tone="amber" title="Note from Jova">{shop.review_note}</Alert>
           </div>
         )}
       </Card>

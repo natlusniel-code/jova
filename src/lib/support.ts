@@ -1,5 +1,5 @@
 /**
- * NaijaMart support contact — ONE source of truth.
+ * Jova support contact — ONE source of truth.
  *
  * Every "Contact support" affordance in the app (footer, help page, chat,
  * order pages, seller onboarding, error states) must build its link from
@@ -20,7 +20,7 @@ export const SUPPORT_WHATSAPP_DISPLAY = "0911 135 6510";
 /**
  * Build a wa.me deep link, optionally with a prefilled message.
  *
- * `https://wa.me/2349111356510?text=Hi%20NaijaMart…`
+ * `https://wa.me/2349111356510?text=Hi%20Jova…`
  *
  * The message is optional because WhatsApp opens fine without it; when
  * given it is URL-encoded so spaces, `₦` and newlines survive.
@@ -33,4 +33,4 @@ export function supportWhatsAppUrl(message?: string): string {
 
 /** The default prefilled line used by generic "Contact support" links. */
 export const SUPPORT_DEFAULT_MESSAGE =
-  "Hi NaijaMart support, I need help with...";
+  "Hi Jova support, I need help with...";

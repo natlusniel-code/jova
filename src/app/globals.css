@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* =====================================================================
-   NaijaMart design system
+   Jova design system
    ---------------------------------------------------------------------
    Warm off-white canvas, deep green brand, generous spacing. Every token
    below is the single source of truth for the whole app: the storefront,
@@ -479,58 +479,59 @@ body {
 /* =====================================================================
    Global loader
    ---------------------------------------------------------------------
-   The ring is a conic gradient masked down to a thin circle: solid brand
-   green at the head, fading to transparent around the back. That gives the
-   two-tone sweep without an SVG dash array, and it stays smooth at any size.
+   The brief: no background, just the star from the cart rolling to show
+   that something is loading. So there is no ring, no plate, no scrim here
+   — one star, turning on its own axis, over whatever page is underneath.
+
+   The star is the artwork lifted from the logo, so the loader and the
+   brand mark are visibly the same object. It is a PNG rather than an SVG
+   because the source is a raster logo; at 84px on a 2x screen it is still
+   crisp, and it keeps the exact silhouette of the mark.
+
+   The rotation is a plain `rotate` on the wrapper, not a 3D flip: a flip
+   reads as a card turning over, while a steady roll reads as work in
+   progress. 1.1s is fast enough to feel alive and slow enough not to
+   strobe on a large screen.
    ===================================================================== */
-.nm-loader-ring {
-  background: conic-gradient(
-    from 0deg,
-    #0b7a45 0deg,
-    #0b7a45 90deg,
-    #4fbf7d 200deg,
-    rgba(11, 122, 69, 0) 330deg,
-    rgba(11, 122, 69, 0) 360deg
-  );
-  /* Punch out the middle so only a ~3px ring remains. */
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
-  animation: nm-loader-spin 1s ease-in-out infinite;
+.nm-star-loader {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  /* No background, no border, no shadow — the star sits on the page. */
+  background: none;
+  animation: nm-star-roll 1.1s linear infinite;
+  /* Promote to its own layer so the rotation stays on the compositor and
+     does not repaint the page underneath on every frame. */
+  will-change: transform;
 }
 
-@keyframes nm-loader-spin {
+.nm-star-loader__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* A soft drop shadow is what keeps a green star legible when it lands on
+     a dark hero image or a green button — it is a shadow, not a plate, so
+     the "no background" rule still holds. */
+  filter: drop-shadow(0 3px 10px rgba(6, 78, 44, 0.3));
+}
+
+@keyframes nm-star-roll {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
-/* Very subtle breathing on the icon — 1 to 1.05, never a bounce. */
-.nm-loader-icon {
-  animation: nm-loader-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes nm-loader-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-}
-
-/* Soft green glow pooled under the icon. */
-.nm-loader-glow {
-  background: radial-gradient(circle, rgba(11, 122, 69, 0.28) 0%, rgba(11, 122, 69, 0) 70%);
-  filter: blur(6px);
-  animation: nm-loader-glow 1.6s ease-in-out infinite;
-}
-
-@keyframes nm-loader-glow {
-  0%, 100% { opacity: 0.55; transform: scale(0.96); }
-  50% { opacity: 0.9; transform: scale(1.04); }
-}
-
-/* Respect a user who has asked the OS to reduce motion: keep the loader
-   (it is information) but stop the spinning and pulsing. */
+/* A user who asked the OS to reduce motion gets a star that breathes
+   instead of one that spins. The loader still communicates "working" —
+   it just does it without rotation, which is the part that causes trouble
+   for people with vestibular sensitivity. */
 @media (prefers-reduced-motion: reduce) {
-  .nm-loader-ring,
-  .nm-loader-icon,
-  .nm-loader-glow {
-    animation: none;
+  .nm-star-loader {
+    animation: nm-star-breathe 1.6s ease-in-out infinite;
   }
+}
+
+@keyframes nm-star-breathe {
+  0%, 100% { transform: scale(0.92); opacity: 0.75; }
+  50% { transform: scale(1); opacity: 1; }
 }

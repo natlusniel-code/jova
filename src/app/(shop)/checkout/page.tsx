@@ -46,7 +46,7 @@ export default async function CheckoutPage() {
     <div>
       <h1 className="mb-1 text-[22px] font-extrabold tracking-tight text-ink-900">Checkout</h1>
       <p className="mb-4 text-[13px] text-ink-500">
-        Transfer to NaijaMart, upload your receipt, and we hold the money until delivery.
+        Transfer to Jova, upload your receipt, and we hold the money until delivery.
       </p>
 
       <CheckoutFlow

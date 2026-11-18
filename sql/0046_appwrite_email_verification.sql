@@ -1,5 +1,5 @@
 -- =====================================================================
--- NaijaMart — 0046 Email verification through Appwrite
+-- Jova — 0046 Email verification through Appwrite
 -- =====================================================================
 -- The app no longer sends its own verification mail. There is no Resend
 -- key, no EMAIL_FROM and no SMTP configuration: Appwrite's built-in SMTP

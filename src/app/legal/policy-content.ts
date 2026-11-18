@@ -1,5 +1,5 @@
 /**
- * The NaijaMart Marketplace Policy, as data.
+ * The Jova Marketplace Policy, as data.
  *
  * Kept in one place so the page, the search index and any future
  * "print / export" view all read the same text. Plain English, written
@@ -27,8 +27,8 @@ export const POLICY_SECTIONS: PolicySection[] = [
     number: 1,
     title: "Introduction and Acceptance",
     body: [
-      "NaijaMart is a marketplace that connects buyers and sellers of products and services. We provide the platform; the seller provides the product or service.",
-      "By using NaijaMart — browsing, listing, chatting, ordering or paying — you accept this policy and the other policies it links to. If you do not accept them, please do not use the platform.",
+      "Jova is a marketplace that connects buyers and sellers of products and services. We provide the platform; the seller provides the product or service.",
+      "By using Jova — browsing, listing, chatting, ordering or paying — you accept this policy and the other policies it links to. If you do not accept them, please do not use the platform.",
       "You must give accurate information when you register and keep it up to date, and you must keep your account secure. Do not share your password, one-time codes or account access with anyone.",
     ],
   },
@@ -38,7 +38,7 @@ export const POLICY_SECTIONS: PolicySection[] = [
     title: "Buyer Policy",
     body: [
       "Before you order, review the item description, the price, the seller's information, the delivery details and the return conditions. Ask the seller questions in the chat if anything is unclear.",
-      "You must not use NaijaMart for fraud, chargeback abuse, harassment or the purchase of anything illegal.",
+      "You must not use Jova for fraud, chargeback abuse, harassment or the purchase of anything illegal.",
       "If something goes wrong with an order, report it promptly through the platform so we can look into it while the details are still fresh.",
     ],
   },
@@ -49,7 +49,7 @@ export const POLICY_SECTIONS: PolicySection[] = [
     body: [
       "Sellers must describe items accurately, use genuine images of what they are actually selling, and state correct prices, stock availability and delivery information.",
       "You may only list lawful products and services that comply with Nigerian law. You must fulfil confirmed orders, communicate professionally, and must not list counterfeit, stolen, dangerous or otherwise prohibited goods.",
-      "NaijaMart may suspend or remove listings and accounts that violate this policy.",
+      "Jova may suspend or remove listings and accounts that violate this policy.",
     ],
   },
   {
@@ -57,7 +57,7 @@ export const POLICY_SECTIONS: PolicySection[] = [
     number: 4,
     title: "Prohibited Products and Activities",
     body: [
-      "The following are not allowed on NaijaMart, and anything else prohibited by Nigerian law:",
+      "The following are not allowed on Jova, and anything else prohibited by Nigerian law:",
     ],
     bullets: [
       "Illegal drugs, weapons and stolen goods",
@@ -94,7 +94,7 @@ export const POLICY_SECTIONS: PolicySection[] = [
     title: "Disputes and Buyer Protection",
     body: [
       "To raise a dispute, open the order, submit your evidence, describe the problem clearly and cooperate with the review.",
-      "Evidence may include photos, videos, delivery records, messages and payment information. NaijaMart may decide the outcome based on the available evidence and platform records.",
+      "Evidence may include photos, videos, delivery records, messages and payment information. Jova may decide the outcome based on the available evidence and platform records.",
     ],
   },
   {
@@ -103,7 +103,7 @@ export const POLICY_SECTIONS: PolicySection[] = [
     title: "Reviews and User Content",
     body: [
       "Reviews must be honest, relevant and based on real transactions. Do not post fake reviews, threats, other people's personal data, hate speech, spam or defamatory content.",
-      "NaijaMart may remove content that violates this policy or the law.",
+      "Jova may remove content that violates this policy or the law.",
     ],
   },
   {
@@ -130,7 +130,7 @@ export const POLICY_SECTIONS: PolicySection[] = [
     title: "Intellectual Property",
     body: [
       "You must own, or have permission to use, the images, logos, descriptions and videos you upload.",
-      "NaijaMart may use content you submit to operate, promote and improve the marketplace, subject to the Privacy Policy and applicable law.",
+      "Jova may use content you submit to operate, promote and improve the marketplace, subject to the Privacy Policy and applicable law.",
     ],
   },
   {
@@ -139,7 +139,7 @@ export const POLICY_SECTIONS: PolicySection[] = [
     title: "Limitation of Responsibility",
     body: [
       "Sellers are responsible for their listings, products, services, fulfilment and legal compliance.",
-      "NaijaMart is a marketplace. We do not manufacture, own or guarantee every listed product or service. Nothing in this policy removes rights that cannot legally be excluded under Nigerian law.",
+      "Jova is a marketplace. We do not manufacture, own or guarantee every listed product or service. Nothing in this policy removes rights that cannot legally be excluded under Nigerian law.",
     ],
   },
   {
@@ -147,7 +147,7 @@ export const POLICY_SECTIONS: PolicySection[] = [
     number: 13,
     title: "Suspension and Termination",
     body: [
-      "NaijaMart may restrict, suspend or terminate accounts for fraud, abuse, non-payment, policy violations, legal requests or security risks.",
+      "Jova may restrict, suspend or terminate accounts for fraud, abuse, non-payment, policy violations, legal requests or security risks.",
       "Pending orders, refunds, disputes and lawful obligations may continue after suspension or termination.",
     ],
   },
@@ -156,7 +156,7 @@ export const POLICY_SECTIONS: PolicySection[] = [
     number: 14,
     title: "Policy Changes",
     body: [
-      "NaijaMart may update this policy and will publish the revised version with an updated effective date. Material changes will be communicated where the law requires it.",
+      "Jova may update this policy and will publish the revised version with an updated effective date. Material changes will be communicated where the law requires it.",
     ],
   },
   {

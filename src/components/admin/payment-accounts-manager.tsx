@@ -193,7 +193,7 @@ export function PaymentAccountsManager({ accounts }: { accounts: PaymentAccount[
             className="nm-input"
             value={form.account_name}
             onChange={(e) => setForm((f) => ({ ...f, account_name: e.target.value }))}
-            placeholder="NaijaMart Ltd"
+            placeholder="Jova Ltd"
             required
           />
         </div>

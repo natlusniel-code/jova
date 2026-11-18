@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { POLICY_EFFECTIVE_DATE, POLICY_LAST_UPDATED } from "../policy-content";
 
-export const metadata = { title: "Refund Policy — NaijaMart" };
+export const metadata = { title: "Refund Policy — Jova" };
 
 export default function RefundsPage() {
   return (
@@ -15,7 +15,7 @@ export default function RefundsPage() {
         <p>
           This Refund Policy forms part of the{" "}
           <Link href="/legal" className="font-semibold text-brand-600 hover:underline">
-            NaijaMart Marketplace Policy
+            Jova Marketplace Policy
           </Link>
           . Section 6 (Orders, Delivery, Cancellation and Returns) and Section 7 (Disputes and Buyer
           Protection) set out the full rules.

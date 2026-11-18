@@ -1,5 +1,5 @@
 -- =====================================================================
--- Storage: one public bucket called "naijamart".
+-- Storage: one public bucket called "jova".
 --
 -- Public bucket because listing photos, shop logos and receipts are shown
 -- in <img> tags. Uploads are still restricted: only a signed-in user may

@@ -1,5 +1,5 @@
 -- =====================================================================
--- NaijaMart — 0003 business rules (RPC layer)
+-- Jova — 0003 business rules (RPC layer)
 -- Run AFTER 0002_rls.sql.
 --
 -- Every state change goes through one of these SECURITY DEFINER functions,

@@ -7,7 +7,7 @@ import { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "./config";
  * Server-side Appwrite bridge.
  *
  * ── The problem this solves ──────────────────────────────────────────────────
- * NaijaMart's entire marketplace — every page, every Server Action, every RLS
+ * Jova's entire marketplace — every page, every Server Action, every RLS
  * policy — is built on a SUPABASE session cookie. Appwrite is a second identity
  * provider bolted on for Google sign-in. If we simply created an Appwrite
  * session and stopped there, the user would be "signed in" to Appwrite and
@@ -161,7 +161,7 @@ async function backfillGoogleAvatar(
  *
  *   • If a Supabase user already has this email (someone who signed up with a
  *     password, or a previous Google sign-in), we reuse that account. This is
- *     what makes "sign in with Google" work for an existing NaijaMart user
+ *     what makes "sign in with Google" work for an existing Jova user
  *     instead of creating a duplicate buyer with no orders.
  *   • Otherwise we create one. The `handle_new_user` trigger (sql/0010) then
  *     creates the matching `profiles` row automatically, defaulting the role to
@@ -287,7 +287,7 @@ export async function findOrCreateSupabaseUser(
 }
 
 /**
- * Thrown when a Google identity has no NaijaMart account and the flow does not
+ * Thrown when a Google identity has no Jova account and the flow does not
  * allow creating one. A distinct class so the action can turn it into a
  * friendly, specific message instead of a generic failure.
  */
@@ -295,7 +295,7 @@ export class NoAccountError extends Error {
   readonly email: string;
   constructor(email: string) {
     super(
-      "There is no NaijaMart account for that Google address. Create an account first, then sign in with Google.",
+      "There is no Jova account for that Google address. Create an account first, then sign in with Google.",
     );
     this.name = "NoAccountError";
     this.email = email;

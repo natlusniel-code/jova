@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { POLICY_EFFECTIVE_DATE, POLICY_LAST_UPDATED } from "../policy-content";
 
-export const metadata = { title: "Community Guidelines — NaijaMart" };
+export const metadata = { title: "Community Guidelines — Jova" };
 
 export default function CommunityGuidelinesPage() {
   return (
@@ -15,7 +15,7 @@ export default function CommunityGuidelinesPage() {
         <p>
           These guidelines form part of the{" "}
           <Link href="/legal" className="font-semibold text-brand-600 hover:underline">
-            NaijaMart Marketplace Policy
+            Jova Marketplace Policy
           </Link>
           . They apply to chats, reviews and every other place users interact.
         </p>
@@ -23,7 +23,7 @@ export default function CommunityGuidelinesPage() {
         <section>
           <h2 className="text-[15px] font-bold text-ink-900">Keep it on the platform</h2>
           <p className="mt-1">
-            Keep communication and payment inside NaijaMart. Messages that share phone numbers,
+            Keep communication and payment inside Jova. Messages that share phone numbers,
             email addresses, social handles, external links or payment details outside the platform
             are blocked automatically — the message is not sent at all, and the sender is warned.
           </p>
@@ -50,7 +50,7 @@ export default function CommunityGuidelinesPage() {
           <h2 className="text-[15px] font-bold text-ink-900">Protect your account</h2>
           <p className="mt-1">
             Never share your password, one-time codes, card details, BVN or NIN. Nobody from
-            NaijaMart will ask for them in a chat.
+            Jova will ask for them in a chat.
           </p>
         </section>
 

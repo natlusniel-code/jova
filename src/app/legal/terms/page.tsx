@@ -3,9 +3,9 @@ import { PolicyBody } from "../policy-body";
 import { POLICY_EFFECTIVE_DATE, POLICY_LAST_UPDATED } from "../policy-content";
 
 export const metadata = {
-  title: "Terms of Service — NaijaMart",
+  title: "Terms of Service — Jova",
   description:
-    "The NaijaMart Terms of Service — buyer and seller rules, payments and escrow, orders, delivery, returns, disputes and more.",
+    "The Jova Terms of Service — buyer and seller rules, payments and escrow, orders, delivery, returns, disputes and more.",
 };
 
 /**
@@ -24,7 +24,7 @@ export default function TermsPage() {
           Terms of Service
         </h1>
         <p className="mt-1.5 text-[13px] text-ink-500">
-          These terms form part of the NaijaMart Marketplace Policy and apply to every buyer and
+          These terms form part of the Jova Marketplace Policy and apply to every buyer and
           seller using the platform.
         </p>
         <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-ink-500">

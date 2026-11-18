@@ -46,7 +46,7 @@ export default function Error({
 
       <a
         href={supportWhatsAppUrl(
-          `Hi NaijaMart support, I need help with... (error reference: ${error.digest ?? "none"})`,
+          `Hi Jova support, I need help with... (error reference: ${error.digest ?? "none"})`,
         )}
         target="_blank"
         rel="noreferrer noopener"

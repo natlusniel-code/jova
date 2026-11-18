@@ -11,7 +11,7 @@ import { Spinner } from "@/components/ui";
  * ── What it does ──────────────────────────────────────────────────────────
  * On click (and only on click) it asks the browser for one position fix and
  * shows the result on a map that opens *inside* the page. Nothing is
- * uploaded, stored or sent to NaijaMart: the coordinates go from the
+ * uploaded, stored or sent to Jova: the coordinates go from the
  * browser's geolocation API into a map URL that the browser itself loads.
  * There is no fetch, no Supabase call and no analytics event here.
  *

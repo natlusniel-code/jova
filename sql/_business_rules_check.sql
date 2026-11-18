@@ -358,8 +358,8 @@ begin
     v_other_acct public.payment_accounts;
   begin
     perform set_config('request.jwt.claim.sub', v_admin::text, true);
-    v_a1 := (public.admin_save_payment_account(null, 'GTBank', '0123456789', 'NaijaMart Ltd', 'Main', null, true, 0)).id;
-    v_a2 := (public.admin_save_payment_account(null, 'Zenith', '9876543210', 'NaijaMart Ltd', 'Backup', null, true, 1)).id;
+    v_a1 := (public.admin_save_payment_account(null, 'GTBank', '0123456789', 'Jova Ltd', 'Main', null, true, 0)).id;
+    v_a2 := (public.admin_save_payment_account(null, 'Zenith', '9876543210', 'Jova Ltd', 'Backup', null, true, 1)).id;
 
     -- buyer A: two consecutive reservations must differ
     perform set_config('request.jwt.claim.sub', v_buyer::text, true);

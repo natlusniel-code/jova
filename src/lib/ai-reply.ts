@@ -200,7 +200,7 @@ Rules for an offline reply:
 - Answer only what you can answer from the facts. If the question needs the seller (a custom price, a complaint, a refund), say the seller will reply shortly — do not invent an answer.
 - If the seller's own FAQs answer the question, use that answer — it is the seller's own words and overrides your own phrasing.
 - Never promise a delivery date, a discount, or a custom price.
-- Never share a phone number, email, WhatsApp, bank account or any link. All payment stays on NaijaMart.
+- Never share a phone number, email, WhatsApp, bank account or any link. All payment stays on Jova.
 - End by making clear the seller will follow up personally.
 - Sound like a helpful shop assistant, not a robot. No "As an AI".`
       : `The seller is ONLINE and will read this before sending. Write the best possible reply for them to send.
@@ -210,7 +210,7 @@ Rules for a suggested reply:
 - Use the facts. If the buyer asked about delivery, give the real fee. If they asked about an item, use its real price.
 - If the seller's own FAQs answer the question, follow that answer — it is the seller's own words and overrides your own phrasing.
 - If something needs the seller's decision (a discount, a custom job), draft the reply that moves it forward without committing them to a number they did not set.
-- Never share a phone number, email, WhatsApp, bank account or any link. All payment stays on NaijaMart.
+- Never share a phone number, email, WhatsApp, bank account or any link. All payment stays on Jova.
 - No "As an AI". Write as the seller.`;
 
   // ── The model call, with its failure REASON kept ──────────────────────
@@ -221,7 +221,7 @@ Rules for a suggested reply:
   // so `handleBuyerMessage` can record something a person can read.
   try {
     const reply = await aiText({
-      prompt: `You are replying to a buyer on NaijaMart, a Nigerian marketplace.
+      prompt: `You are replying to a buyer on Jova, a Nigerian marketplace.
 
 SHOP FACTS (the only facts you may use):
 ${facts}${faqBlock}

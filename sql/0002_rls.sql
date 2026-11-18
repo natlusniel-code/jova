@@ -1,5 +1,5 @@
 -- =====================================================================
--- NaijaMart — 0002 Row Level Security
+-- Jova — 0002 Row Level Security
 -- Run AFTER 0001_schema.sql.
 --
 -- Model:

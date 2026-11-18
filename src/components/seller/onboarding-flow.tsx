@@ -67,7 +67,7 @@ export function OnboardingFlow({ step, shop, signedIn, categories, subscriptionP
     return (
       <Card className="mx-auto max-w-md p-6 text-center">
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-2xl">🏪</div>
-        <h1 className="mt-3 text-[19px] font-extrabold text-ink-900">Open your shop on NaijaMart</h1>
+        <h1 className="mt-3 text-[19px] font-extrabold text-ink-900">Open your shop on Jova</h1>
         <p className="mt-1.5 text-[13px] leading-relaxed text-ink-500">
           List goods or offer services to buyers in your state. Free to start — the first ₦{subscriptionPrice.toLocaleString()} comes out of your first payout.
         </p>
@@ -502,7 +502,7 @@ export function OnboardingFlow({ step, shop, signedIn, categories, subscriptionP
 
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
             <a
-              href={supportWhatsAppUrl("Hi, I just submitted my NaijaMart seller application.")}
+              href={supportWhatsAppUrl("Hi, I just submitted my Jova seller application.")}
               target="_blank" rel="noreferrer" className="nm-btn-ghost"
             >
               Contact support on WhatsApp

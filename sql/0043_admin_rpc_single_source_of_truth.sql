@@ -1,5 +1,5 @@
 -- =====================================================================
--- NaijaMart — 0043 Admin RPCs are the single source of truth
+-- Jova — 0043 Admin RPCs are the single source of truth
 --
 -- Problem this fixes
 -- ------------------

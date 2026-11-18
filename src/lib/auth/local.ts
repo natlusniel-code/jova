@@ -12,7 +12,7 @@ type CookieToSet = {
 };
 
 /**
- * NaijaMart's session plumbing — server side.
+ * Jova's session plumbing — server side.
  *
  * ── What this file is now ───────────────────────────────────────────────────
  * Google is the only way into the marketplace, so there is no password store

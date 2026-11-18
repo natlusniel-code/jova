@@ -1,6 +1,6 @@
 # Buyer–seller chat: presence-gated AI, live delivery, typing, status, pinned composer
 
-Base commit: `6d2e5aa` · Branch: `main` · Repo: `natlusniel-code/naijamart-marketplace`
+Base commit: `6d2e5aa` · Branch: `main` · Repo: `natlusniel-code/jova-marketplace`
 
 ---
 

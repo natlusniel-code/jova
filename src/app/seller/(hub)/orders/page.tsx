@@ -79,7 +79,7 @@ export default async function SellerOrdersPage({ searchParams }: { searchParams:
         <EmptyState
           icon="🧾"
           title={tab === "new" ? "No new orders to accept" : "Nothing in this tab"}
-          body="Paid orders land here the moment NaijaMart verifies the buyer's transfer. You'll have 24 hours to accept."
+          body="Paid orders land here the moment Jova verifies the buyer's transfer. You'll have 24 hours to accept."
           action="View your listings"
           href="/seller/listings"
         />

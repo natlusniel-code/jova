@@ -37,7 +37,7 @@ export function SiteFooter() {
             scrolling, so nothing is ever cut off. */}
         <nav className="flex flex-wrap items-center gap-x-7 gap-y-2.5" aria-label="Footer">
           <Link href="/" className="text-[14px] font-extrabold tracking-[-0.02em] text-[#1a1a1a]">
-            NaijaMart
+            Jova
           </Link>
           {LINKS.map((l) => (
             <Link key={l.href} href={l.href} className="nm-foot-link">
@@ -54,7 +54,7 @@ export function SiteFooter() {
           <span aria-hidden="true" className="text-[#b9b4a8]">
             •
           </span>
-          <span>© {new Date().getFullYear()} NaijaMart</span>
+          <span>© {new Date().getFullYear()} Jova</span>
         </div>
       </div>
     </footer>

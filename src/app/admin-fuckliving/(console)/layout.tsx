@@ -17,7 +17,7 @@ import Link from "next/link";
  * nothing here may be statically cached at build time.
  */
 export const dynamic = "force-dynamic";
-export const metadata = { title: "NaijaMart admin" };
+export const metadata = { title: "Jova admin" };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   /* Drive the push queue from the console too. The dispatcher used to run only

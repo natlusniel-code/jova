@@ -1,4 +1,4 @@
-/* NaijaMart service worker — browser notifications.
+/* Jova service worker — browser notifications.
  *
  * Two jobs, both about getting an order update in front of the buyer when the
  * tab is not open:
@@ -50,11 +50,11 @@ self.addEventListener("fetch", () => {
  */
 const SOURCES = {
   chat: { label: "Message", subtitle: "New message", href: "/chats" },
-  order: { label: "Order update", subtitle: "NaijaMart orders", href: "/orders" },
-  broadcast: { label: "NaijaMart", subtitle: "Announcement", href: "/notifications" },
-  system: { label: "NaijaMart", subtitle: "Account notice", href: "/notifications" },
-  promo: { label: "NaijaMart offer", subtitle: "Deals and discounts", href: "/notifications" },
-  delivery: { label: "Delivery", subtitle: "NaijaMart delivery", href: "/notifications" },
+  order: { label: "Order update", subtitle: "Jova orders", href: "/orders" },
+  broadcast: { label: "Jova", subtitle: "Announcement", href: "/notifications" },
+  system: { label: "Jova", subtitle: "Account notice", href: "/notifications" },
+  promo: { label: "Jova offer", subtitle: "Deals and discounts", href: "/notifications" },
+  delivery: { label: "Delivery", subtitle: "Jova delivery", href: "/notifications" },
 };
 
 /**
@@ -62,9 +62,9 @@ const SOURCES = {
  *
  * ── The bug this fixes ────────────────────────────────────────────────
  * Every notification used its own tag (or none), so the phone's notification
- * centre filled with a separate NaijaMart entry per event — five orders meant
+ * centre filled with a separate Jova entry per event — five orders meant
  * five rows, and the shade became unreadable. The requirement is that
- * NaijaMart notifications arrive as ONE grouped entry, and opening it shows
+ * Jova notifications arrive as ONE grouped entry, and opening it shows
  * the rest.
  *
  * Android groups by `tag` when the tag is shared, so every notification now
@@ -73,7 +73,7 @@ const SOURCES = {
  * listed. `renotify: false` is deliberate: re-alerting on every collapse
  * would buzz the phone once per order, which is the noise we are removing.
  */
-const GROUP_TAG = "naijamart";
+const GROUP_TAG = "jova";
 
 function sourceFor(kind) {
   return SOURCES[kind] || SOURCES.system;
@@ -110,10 +110,14 @@ function show(payload) {
 
     const options = {
       body: count > 1 ? `${body} · ${count} new updates` : body,
-      // The green cart on a transparent background. The old value was the full
-      // app tile, which the OS drew as a white square — the reported bug.
+      // The plate icon reads on a light and on a dark shade. The badge is the
+      // monochrome silhouette Android keeps only the alpha of, so it must be
+      // a solid shape — a full-colour image here renders as a blank blob.
+      // The page picks the badge that contrasts with the phone's theme and
+      // sends it in the payload; the white one is the fallback because most
+      // notification shades are dark.
       icon: payload.icon || "/notification-icon-192.png",
-      badge: payload.badge || "/notification-icon-96.png",
+      badge: payload.badge || "/notification-icon-white.png",
       // One shared tag = one grouped entry in the shade.
       tag: GROUP_TAG,
       // Do not buzz again when the group collapses; the first alert is enough.
@@ -133,7 +137,7 @@ self.addEventListener("push", (event) => {
     payload = event.data ? event.data.json() : {};
   } catch {
     // A push with a plain-text body is still worth showing.
-    payload = { kind: "system", title: "NaijaMart", body: event.data ? event.data.text() : "" };
+    payload = { kind: "system", title: "Jova", body: event.data ? event.data.text() : "" };
   }
   event.waitUntil(show(payload));
 });
@@ -151,7 +155,7 @@ self.addEventListener("notificationclick", (event) => {
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-      // Reuse an open NaijaMart tab if there is one, rather than piling up
+      // Reuse an open Jova tab if there is one, rather than piling up
       // windows every time a buyer taps a notification.
       for (const client of list) {
         if ("focus" in client) {

@@ -78,7 +78,7 @@ export default async function SellerNotificationsPage() {
         <EmptyState
           icon="🔔"
           title="No notifications yet"
-          body="New orders, buyer messages and NaijaMart announcements will show up here."
+          body="New orders, buyer messages and Jova announcements will show up here."
           action="Back to dashboard"
           href="/seller"
         />

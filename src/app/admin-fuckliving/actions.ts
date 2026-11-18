@@ -39,6 +39,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient, hasAdminKey } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/admin-guard";
+import { isPlayableVideoUrl } from "@/lib/login-media";
 
 export type ActionResult = { ok: boolean; error?: string };
 
@@ -419,6 +420,17 @@ export async function saveLoginVideo(input: {
       return { ok: false, error: `${label} must be a full http(s) URL, or empty to use the default.` };
     }
     if (v.length > 2048) return { ok: false, error: `${label} is too long.` };
+    // A Drive/Docs "view" page or a YouTube watch page is HTML, not media:
+    // the player would sit on its poster forever. Reject it here so the
+    // admin finds out at save time instead of wondering why the login page
+    // ignores their video. See isPlayableVideoUrl in src/lib/login-media.ts.
+    if (label === "Video URL" && !isPlayableVideoUrl(v)) {
+      return {
+        ok: false,
+        error:
+          "That link is a web page, not a video file. Use a direct .mp4/.webm URL (for Google Drive, the /uc?export=download link), or leave it empty to use the bundled video.",
+      };
+    }
     return { ok: true, value: v };
   };
 
