@@ -63,10 +63,55 @@ export function isPlayableVideoUrl(url: string): boolean {
   if (host === "youtube.com" || host === "youtu.be" || host === "m.youtube.com") {
     return false;
   }
+
+  // ── Share pages ────────────────────────────────────────────────────────
+  // A "share" link is a web page that WRAPS a file, not the file. Gemini's
+  // share links are the case that actually bit us: `share.gemini.google/<id>`
+  // 301s to `gemini.google.com/share/<id>`, which answers `text/html`. The
+  // video element fetches that, gets HTML, and sits on its poster forever
+  // with `readyState: 0` — the same failure as the Drive view link, from a
+  // host the old check did not know about.
+  //
+  // This is a general rule, not a list of one vendor: any host whose path
+  // starts with `/share/`, or any `share.` subdomain, is a page. A direct
+  // media file never lives at such a path.
+  if (host.startsWith("share.") || path.startsWith("/share/") || path.includes("/share/")) {
+    return false;
+  }
+  if (host === "gemini.google.com" || host === "bard.google.com") return false;
+
   // Any other page-shaped URL (a `.html`/`.htm` document) is not media.
   if (path.endsWith(".html") || path.endsWith(".htm")) return false;
 
-  return true;
+  // ── Require positive evidence that this is a media file ────────────────
+  // Everything above is a blocklist, and a blocklist only catches the shapes
+  // someone thought of. The failure is silent and total (a dead player on the
+  // login page), so the default has to be "reject unless it looks like a
+  // file". A path ending in a media extension is the evidence; a known media
+  // host is accepted without one, because those serve files from opaque
+  // paths. Anything else falls back to the bundled video, which is always
+  // correct — a false rejection only costs a custom video, while a false
+  // acceptance leaves the login page broken.
+  const MEDIA_EXT = /\.(mp4|webm|ogv|ogg|mov|m4v|avi|mkv)$/;
+  if (MEDIA_EXT.test(path)) return true;
+
+  const MEDIA_HOSTS = [
+    "supabase.co",
+    "supabase.in",
+    "cloudinary.com",
+    "res.cloudinary.com",
+    "mux.com",
+    "stream.mux.com",
+    "cloudflarestream.com",
+    "bunnycdn.com",
+    "vimeocdn.com",
+    "akamaized.net",
+    "cloudfront.net",
+    "becdn.net",
+    "teamily.ai",
+    "imserver.teamily.ai",
+  ];
+  return MEDIA_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
 }
 
 export type LoginMedia = { video: string; poster: string };

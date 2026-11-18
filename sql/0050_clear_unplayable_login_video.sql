@@ -15,9 +15,16 @@
 -- the truth — an empty field meaning "use the bundled video" — instead of
 -- a URL that looks configured but does nothing.
 --
--- It is deliberately narrow: only Drive/Docs *view* links and YouTube watch
--- pages are cleared. A direct file URL an admin has set on purpose is left
--- exactly as it is.
+-- It is deliberately narrow: only Drive/Docs *view* links, YouTube watch
+-- pages and share pages are cleared. A direct file URL an admin has set on
+-- purpose is left exactly as it is.
+--
+-- ── The second bad value ──────────────────────────────────────────────────
+-- After the Drive link was cleared, the field was set to a Gemini share link
+-- (`https://share.gemini.google/<id>`). That is the same class of mistake: it
+-- 301s to `gemini.google.com/share/<id>`, which answers `text/html`. So the
+-- pattern below also matches any `share.` host and any `/share/` path, which
+-- is the general shape of a share page rather than one vendor's.
 
 update public.platform_settings
 set login_video_url = ''
@@ -26,6 +33,9 @@ where id = 1
   and (
     login_video_url ~* '^https?://(www\.)?(drive|docs)\.google\.com/.*(/view|/edit)'
     or login_video_url ~* '^https?://(www\.)?(m\.)?(youtube\.com/watch|youtu\.be/)'
+    or login_video_url ~* '^https?://share\.'
+    or login_video_url ~* '^https?://[^/]+/share/'
+    or login_video_url ~* '^https?://(www\.)?(gemini|bard)\.google\.com/'
   );
 
 comment on column public.platform_settings.login_video_url is
