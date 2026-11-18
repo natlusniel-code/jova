@@ -142,6 +142,31 @@ self.addEventListener("push", (event) => {
   event.waitUntil(show(payload));
 });
 
+/**
+ * The push service rotated or expired this subscription.
+ *
+ * Chrome fires this when a subscription is invalidated — most often after a
+ * long period without a push, or when the browser's push service is reset.
+ * Without a handler the old endpoint stays in `push_subscriptions` and every
+ * future send to it fails with 410, so the device silently stops receiving
+ * anything and never recovers.
+ *
+ * Re-subscribing here needs the VAPID public key, which the worker does not
+ * have (it cannot import the TS module). So it asks an open page to do it: the
+ * page has the key and the signed-in session needed to write the new row. If
+ * no page is open, the next visit re-registers anyway via
+ * `ensurePushSubscription()` in the notification bridge.
+ */
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        client.postMessage({ type: "nm:resubscribe" });
+      }
+    }),
+  );
+});
+
 self.addEventListener("message", (event) => {
   const data = event.data || {};
   if (data.type === "nm:notify") {

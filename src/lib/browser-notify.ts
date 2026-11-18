@@ -140,6 +140,21 @@ export async function showBrowserNotification(payload: {
  * Returns a clear reason when it cannot, rather than failing silently: without
  * a VAPID public key there is nothing to subscribe with, and pretending
  * otherwise would leave the user believing background push is live.
+ *
+ * ── Why an existing subscription is checked, not just reused ──────────────
+ * `getSubscription()` returns whatever this browser already holds, and the old
+ * code stored it without looking at it. That is the single most common way
+ * Web Push dies silently: a subscription is bound to the application server
+ * key it was created with, and the push service rejects any message signed
+ * with a different VAPID key (403). So a device that subscribed before the key
+ * changed keeps a row in `push_subscriptions` that can never be delivered to —
+ * the server reports `sent: 1`, the phone shows nothing, and nothing anywhere
+ * says why.
+ *
+ * The fix is to compare the subscription's own `applicationServerKey` with the
+ * key we are about to sign with. If they differ, the old subscription is
+ * dropped and a new one is created against the current key. That is the only
+ * way a device recovers on its own.
  */
 export async function subscribeToPush(vapidPublicKey?: string): Promise<{
   ok: boolean;
@@ -159,18 +174,50 @@ export async function subscribeToPush(vapidPublicKey?: string): Promise<{
   const reg = (await navigator.serviceWorker.getRegistration(SW_PATH)) ?? (await registerServiceWorker());
   if (!reg) return { ok: false, error: "Could not start the notification service." };
 
+  const wanted = urlBase64ToUint8Array(vapidPublicKey);
+
   try {
-    const existing = await reg.pushManager.getSubscription();
+    let existing = await reg.pushManager.getSubscription();
+
+    // A subscription made with a different key can never be delivered to.
+    // Drop it and start again rather than storing a dead endpoint.
+    if (existing && !sameKey(existing.options?.applicationServerKey, wanted)) {
+      try {
+        await existing.unsubscribe();
+      } catch {
+        /* the push service may already have discarded it */
+      }
+      existing = null;
+    }
+
     const sub =
       existing ??
       (await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        applicationServerKey: wanted,
       }));
     return { ok: true, subscription: sub.toJSON() as PushSubscriptionJSON };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Could not subscribe to push." };
   }
+}
+
+/**
+ * Do two application server keys describe the same P-256 point?
+ *
+ * `applicationServerKey` comes back as an ArrayBuffer (or null on a browser
+ * that does not expose it). A null is treated as "unknown", and unknown is
+ * treated as a match — re-subscribing on every page load would churn the
+ * subscription and is worse than trusting an existing one.
+ */
+function sameKey(a: ArrayBuffer | null | undefined, b: Uint8Array): boolean {
+  if (!a) return true;
+  const left = new Uint8Array(a);
+  if (left.length !== b.length) return false;
+  for (let i = 0; i < left.length; i++) {
+    if (left[i] !== b[i]) return false;
+  }
+  return true;
 }
 
 /** VAPID keys are base64url; PushManager wants raw bytes. */

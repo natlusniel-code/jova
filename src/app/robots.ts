@@ -11,11 +11,11 @@ import type { MetadataRoute } from "next";
  * useful to a crawler and would just be a wall of redirects.
  */
 export default function robots(): MetadataRoute.Robots {
-  const base =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : "https://naijamart-marketplace-opal.vercel.app");
+  // Same precedence as `metadataBase` in layout.tsx: the Vercel host is
+  // guaranteed to resolve, a configured custom domain may not be live yet.
+  const base = process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.NEXT_PUBLIC_SITE_URL || "https://naijamart-marketplace-opal.vercel.app";
 
   return {
     rules: [

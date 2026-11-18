@@ -32,6 +32,14 @@ export function NotificationBridge() {
     let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
     const supabase = createClient();
 
+    // Declared out here, not inside the async IIFE below, because the cleanup
+    // function has to be able to remove it. A listener added inside the IIFE
+    // would be unreachable from the return, and would leak one handler per
+    // mount.
+    const onSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === "nm:resubscribe") void ensurePushSubscription();
+    };
+
     (async () => {
       const { data: auth } = await supabase.auth.getUser();
       const uid = auth?.user?.id;
@@ -39,6 +47,13 @@ export function NotificationBridge() {
 
       // 1. Make this device reachable by the server.
       void ensurePushSubscription();
+
+      // 1b. The push service can invalidate a subscription at any time
+      // (`pushsubscriptionchange`). The worker cannot re-subscribe on its own
+      // — it has no VAPID key and no session — so it asks an open page to do
+      // it. Without this the device keeps a dead endpoint in
+      // `push_subscriptions` and silently stops receiving anything.
+      navigator.serviceWorker?.addEventListener("message", onSwMessage);
 
       // 2. Live OS notification for a row that arrives while we are open.
       channel = supabase
@@ -76,6 +91,7 @@ export function NotificationBridge() {
 
     return () => {
       cancelled = true;
+      navigator.serviceWorker?.removeEventListener("message", onSwMessage);
       if (channel) supabase.removeChannel(channel);
     };
   }, []);

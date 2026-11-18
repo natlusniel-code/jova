@@ -24,7 +24,7 @@
  * below is the authority; sw.js carries the same table and says so.
  */
 
-export type NotificationKind = "order" | "chat" | "broadcast" | "system" | "promo";
+export type NotificationKind = "order" | "chat" | "broadcast" | "system" | "promo" | "delivery";
 
 export type NotificationSource = {
   /** The label shown as the notification's title prefix. */
@@ -59,6 +59,16 @@ export const NOTIFICATION_SOURCES: Record<NotificationKind, NotificationSource> 
   promo: {
     label: "Jova offer",
     subtitle: "Deals and discounts",
+    href: "/notifications",
+  },
+  // `delivery` is written by the order-lifecycle triggers in sql/0028 and is
+  // accepted by the database's kind constraint, but it was missing from this
+  // table. `sourceFor()` fell through to `system`, so a delivery update
+  // arrived titled "Jova — ..." instead of "Delivery — ...". The type now
+  // includes it, so the compiler catches the omission if it ever recurs.
+  delivery: {
+    label: "Delivery",
+    subtitle: "Jova delivery",
     href: "/notifications",
   },
 };

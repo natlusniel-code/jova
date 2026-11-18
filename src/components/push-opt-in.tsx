@@ -27,6 +27,11 @@ export function PushOptIn() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [pushNote, setPushNote] = useState("");
+  // Whether this device actually holds a push subscription — not merely
+  // whether permission was granted. The two are different, and conflating
+  // them is what made the old panel say "notifications are on" over a device
+  // the server could not reach.
+  const [subscribed, setSubscribed] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!notificationsSupported()) {
@@ -36,6 +41,18 @@ export function PushOptIn() {
     setState(notificationPermission() as State);
     // Register early so the worker is ready the moment permission is granted.
     void registerServiceWorker();
+
+    // Ask the browser whether a live subscription exists. This is the only
+    // honest answer to "will a notification reach this phone?".
+    void (async () => {
+      try {
+        const reg = await navigator.serviceWorker.getRegistration("/sw.js");
+        const sub = await reg?.pushManager.getSubscription();
+        setSubscribed(Boolean(sub));
+      } catch {
+        setSubscribed(false);
+      }
+    })();
   }, []);
 
   async function enable() {
@@ -44,9 +61,9 @@ export function PushOptIn() {
     setPushNote("");
     const res = await enableBrowserNotifications();
     setState(res.permission as State);
-    setBusy(false);
 
     if (!res.ok) {
+      setBusy(false);
       setNote(res.error ?? "Notifications were not enabled.");
       return;
     }
@@ -60,22 +77,37 @@ export function PushOptIn() {
       const supabase = createClient();
       const { data: auth } = await supabase.auth.getUser();
       const uid = auth?.user?.id;
-      if (uid) {
-        await supabase.from("push_subscriptions").upsert(
-          {
-            user_id: uid,
-            endpoint: sub.subscription.endpoint,
-            p256dh: sub.subscription.keys?.p256dh ?? "",
-            auth: sub.subscription.keys?.auth ?? "",
-            user_agent: navigator.userAgent.slice(0, 200),
-            last_seen_at: new Date().toISOString(),
-          },
-          { onConflict: "endpoint" },
-        );
-        setPushNote("This device is also registered for background push.");
+      if (!uid) {
+        setBusy(false);
+        setSubscribed(false);
+        setPushNote("Sign in to receive notifications when the app is closed.");
+        return;
       }
-    } else if (sub.error) {
-      setPushNote(sub.error);
+      const { error } = await supabase.from("push_subscriptions").upsert(
+        {
+          user_id: uid,
+          endpoint: sub.subscription.endpoint,
+          p256dh: sub.subscription.keys?.p256dh ?? "",
+          auth: sub.subscription.keys?.auth ?? "",
+          user_agent: navigator.userAgent.slice(0, 200),
+          last_seen_at: new Date().toISOString(),
+        },
+        { onConflict: "endpoint" },
+      );
+      setBusy(false);
+      if (error) {
+        // The browser subscribed but the row was not saved, so the server
+        // still cannot reach this device. Say so instead of claiming success.
+        setSubscribed(false);
+        setPushNote(`This device could not be registered: ${error.message}`);
+        return;
+      }
+      setSubscribed(true);
+      setPushNote("This device is also registered for background push.");
+    } else {
+      setBusy(false);
+      setSubscribed(false);
+      setPushNote(sub.error ?? "Background push could not be enabled on this device.");
     }
   }
 
@@ -88,6 +120,22 @@ export function PushOptIn() {
   }
 
   if (state === "granted") {
+    // Permission granted but no subscription is a real, common state — the
+    // user allowed notifications on an earlier visit, before the subscription
+    // code existed, or the push service dropped it. Saying "you're all set"
+    // there is a lie the user only discovers when an order ships silently.
+    if (subscribed === false) {
+      return (
+        <Alert tone="amber" title="Notifications are allowed, but this device isn't registered">
+          Your browser allows notifications, but this device has no push subscription, so nothing can reach it while
+          the app is closed.{" "}
+          <button onClick={enable} disabled={busy} className="font-semibold underline underline-offset-2">
+            {busy ? "Registering…" : "Register this device"}
+          </button>
+          {pushNote && <span className="mt-1 block opacity-80">{pushNote}</span>}
+        </Alert>
+      );
+    }
     return (
       <Alert tone="green" title="Phone notifications are on">
         You&apos;ll get a notification when an order moves — payment confirmed, shipped, delivered.{" "}

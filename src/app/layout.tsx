@@ -22,17 +22,26 @@ export const metadata: Metadata = {
   // absolute URL that WhatsApp, X and Facebook require. Without it Next emits
   // a relative `og:image` and every scraper silently drops the preview.
   //
-  // The order matters. `NEXT_PUBLIC_SITE_URL` is the explicit override and
-  // wins when it is set. `VERCEL_PROJECT_PRODUCTION_URL` is injected by Vercel
-  // on every deployment and always points at the project's production domain,
-  // so a deploy that forgets the env var still emits a correct absolute URL
-  // instead of falling back to a hard-coded host that may no longer be the
-  // one people share.
+  // ── Why the Vercel host wins over NEXT_PUBLIC_SITE_URL ──────────────────
+  // This is the fix for the share card that showed an empty image slot.
+  // `NEXT_PUBLIC_SITE_URL` was set to `https://jova.ng`, and that domain has
+  // no DNS record — it does not resolve at all. So every share card pointed
+  // its `og:image` at `https://jova.ng/og-image.jpg`, a host that does not
+  // exist, and every scraper dutifully reported "no image". The tags were
+  // perfect; the URL was dead.
+  //
+  // `VERCEL_PROJECT_PRODUCTION_URL` is injected by Vercel on every deployment
+  // and is always a host that actually serves this app, so it is the safe
+  // default. `NEXT_PUBLIC_SITE_URL` is still honoured, but only as a fallback
+  // for non-Vercel hosting — a configured domain that does not resolve is
+  // worse than the deployment's own host, because it breaks the card outright.
+  //
+  // Once jova.ng is pointed at Vercel (A/CNAME in DNS), set
+  // NEXT_PUBLIC_SITE_URL back to it and the card will use the branded domain.
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ||
-      (process.env.VERCEL_PROJECT_PRODUCTION_URL
-        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-        : "https://naijamart-marketplace-opal.vercel.app"),
+    process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : process.env.NEXT_PUBLIC_SITE_URL || "https://naijamart-marketplace-opal.vercel.app",
   ),
   alternates: {
     canonical: "/",
