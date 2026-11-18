@@ -61,15 +61,21 @@ export function GlobalLoader() {
       {s.failed ? (
         <RetryPanel />
       ) : (
-        <span className="nm-star-loader" aria-hidden="true">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/jova-mark-star.png"
-            alt=""
-            width={96}
-            height={96}
-            className="nm-star-loader__img"
-          />
+        <span className="nm-loader-ring" aria-hidden="true">
+          {/* The star is drawn, not an image: it has to be an outline with no
+              fill, and a PNG of a solid star cannot be un-filled. `fill="none"`
+              with a stroke is the whole point of the brief — the circle carries
+              the brand green, the star is colourless and only its edge shows. */}
+          <svg className="nm-loader-star" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.5L12 17.5l-5.8 3.05 1.1-6.5-4.7-4.6 6.5-.95z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          </svg>
         </span>
       )}
       <span className="sr-only">{s.failed ? "Loading failed" : s.label}</span>

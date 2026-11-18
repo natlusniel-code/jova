@@ -95,20 +95,22 @@ export function ShopHeader({
         {/* ── Row one ─────────────────────────────────────────────────── */}
         <div className="flex min-w-0 items-center gap-3">
           <Link href="/" className="flex min-w-0 shrink items-center" aria-label="Jova Marketplace home">
-            {/* The Jova lockup. The mark alone on a narrow phone, where the
-                wordmark would be squeezed against the icon cluster. */}
+            {/* The Jova lockup — the cart-and-star mark with the "jova"
+                wordmark beside it, as one unit.
+
+                It used to swap to the bare mark below `sm`, on the theory that
+                the wordmark would be squeezed against the icon cluster on a
+                narrow phone. It is not: the lockup is 3.5:1, so at 24px tall
+                it is only ~84px wide, which leaves the bell and cart buttons
+                plenty of room at 360px. Dropping the wordmark on mobile meant
+                the brand was a nameless green cart on the device most people
+                actually use, so the lockup now renders at every breakpoint and
+                only its height steps down. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/jova-logo.png"
               alt="Jova Marketplace"
-              className="hidden h-[27px] w-auto select-none sm:block"
-              draggable={false}
-            />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/jova-mark.png"
-              alt="Jova Marketplace"
-              className="h-8 w-auto select-none sm:hidden"
+              className="h-[24px] w-auto select-none sm:h-[27px]"
               draggable={false}
             />
           </Link>

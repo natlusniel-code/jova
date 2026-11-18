@@ -493,27 +493,41 @@ body {
    progress. 1.1s is fast enough to feel alive and slow enough not to
    strobe on a large screen.
    ===================================================================== */
-.nm-star-loader {
+/* ── The loader ────────────────────────────────────────────────────────────
+   A green ring with a colourless star inside it, and the star turns.
+
+   The brief was specific and it is worth writing down, because the obvious
+   reading is wrong: the CIRCLE is the green element and the STAR has no fill
+   at all — it is an outline, so the page shows through the middle of it. The
+   star is the only thing that rotates; the ring stays put, so the motion reads
+   as the star rolling inside a fixed frame rather than the whole badge
+   spinning. There is still no background plate of any kind. */
+.nm-loader-ring {
   display: grid;
   place-items: center;
-  width: 96px;
-  height: 96px;
-  /* No background, no border, no shadow — the star sits on the page. */
+  width: 64px;
+  height: 64px;
+  border-radius: 9999px;
+  /* The ring. `border` rather than a background so the inside stays empty —
+     a filled disc would put a green plate behind the star, which is exactly
+     what "no background" rules out. */
+  border: 3px solid var(--brand);
+  /* No background, no shadow: the ring and the star sit on the page. */
   background: none;
-  animation: nm-star-roll 1.1s linear infinite;
-  /* Promote to its own layer so the rotation stays on the compositor and
-     does not repaint the page underneath on every frame. */
-  will-change: transform;
 }
 
-.nm-star-loader__img {
+.nm-loader-star {
   display: block;
-  width: 100%;
-  height: 100%;
-  /* A soft drop shadow is what keeps a green star legible when it lands on
-     a dark hero image or a green button — it is a shadow, not a plate, so
-     the "no background" rule still holds. */
-  filter: drop-shadow(0 3px 10px rgba(6, 78, 44, 0.3));
+  width: 30px;
+  height: 30px;
+  /* The star's own colour. It has no fill (see the SVG's `fill="none"`), so
+     this only paints the outline. */
+  color: var(--brand);
+  animation: nm-star-roll 1.15s linear infinite;
+  /* Its own layer, so the rotation is a compositor transform and does not
+     repaint the page underneath on every frame. */
+  will-change: transform;
+  transform-origin: 50% 50%;
 }
 
 @keyframes nm-star-roll {
@@ -526,12 +540,12 @@ body {
    it just does it without rotation, which is the part that causes trouble
    for people with vestibular sensitivity. */
 @media (prefers-reduced-motion: reduce) {
-  .nm-star-loader {
+  .nm-loader-star {
     animation: nm-star-breathe 1.6s ease-in-out infinite;
   }
 }
 
 @keyframes nm-star-breathe {
-  0%, 100% { transform: scale(0.92); opacity: 0.75; }
+  0%, 100% { transform: scale(0.88); opacity: 0.7; }
   50% { transform: scale(1); opacity: 1; }
 }

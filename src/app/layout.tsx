@@ -21,9 +21,22 @@ export const metadata: Metadata = {
   // `metadataBase` is what turns the relative OG image path below into the
   // absolute URL that WhatsApp, X and Facebook require. Without it Next emits
   // a relative `og:image` and every scraper silently drops the preview.
+  //
+  // The order matters. `NEXT_PUBLIC_SITE_URL` is the explicit override and
+  // wins when it is set. `VERCEL_PROJECT_PRODUCTION_URL` is injected by Vercel
+  // on every deployment and always points at the project's production domain,
+  // so a deploy that forgets the env var still emits a correct absolute URL
+  // instead of falling back to a hard-coded host that may no longer be the
+  // one people share.
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || "https://naijamart-marketplace-opal.vercel.app",
+    process.env.NEXT_PUBLIC_SITE_URL ||
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : "https://naijamart-marketplace-opal.vercel.app"),
   ),
+  alternates: {
+    canonical: "/",
+  },
   title: {
     default: "Jova Marketplace — buy and hire from verified sellers in your state",
     template: "%s · Jova Marketplace",
@@ -70,6 +83,16 @@ export const metadata: Metadata = {
     images: [
       {
         url: "/og-image.jpg",
+        // `type` is not required by the spec, but several fetchers (WhatsApp's
+        // in particular) are stricter than the spec and will skip an image they
+        // cannot type from the URL alone.
+        //
+        // No `secureUrl`: Next does not resolve that field against
+        // `metadataBase`, so it emitted a relative `/og-image.jpg` — which is
+        // worse than omitting it, because a fetcher that prefers `secure_url`
+        // would then have a URL it cannot fetch. `og:image` above is already
+        // absolute and https, which is all the spec asks for.
+        type: "image/jpeg",
         width: 1200,
         height: 630,
         alt: "Jova Marketplace — buy and hire from verified sellers in your state",
@@ -81,7 +104,7 @@ export const metadata: Metadata = {
     title: "Jova Marketplace — buy and hire from verified sellers",
     description:
       "Buy and hire from verified sellers in your state. Escrow-protected, so you pay only when you accept.",
-    images: ["/og-image.jpg"],
+    images: [{ url: "/og-image.jpg", alt: "Jova Marketplace" }],
   },
 };
 
