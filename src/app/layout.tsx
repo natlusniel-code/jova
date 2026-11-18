@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
+import { headers } from "next/headers";
 import { INSTALL_CAPTURE_SCRIPT } from "@/lib/install-capture";
 import { GlobalLoader } from "@/components/global-loader";
 import { GlobalLoaderTriggers } from "@/components/global-loader-triggers";
@@ -17,35 +18,59 @@ import "./legacy-palette.css";
 // win where they overlap the base system. See the file's own comment.
 import "./reference.css";
 
-export const metadata: Metadata = {
-  // `metadataBase` is what turns the relative OG image path below into the
-  // absolute URL that WhatsApp, X and Facebook require. Without it Next emits
-  // a relative `og:image` and every scraper silently drops the preview.
-  //
-  // ── Why the Vercel host wins over NEXT_PUBLIC_SITE_URL ──────────────────
-  // This is the fix for the share card that showed an empty image slot.
-  // `NEXT_PUBLIC_SITE_URL` was set to `https://jova.ng`, and that domain has
-  // no DNS record — it does not resolve at all. So every share card pointed
-  // its `og:image` at `https://jova.ng/og-image.jpg`, a host that does not
-  // exist, and every scraper dutifully reported "no image". The tags were
-  // perfect; the URL was dead.
-  //
-  // `VERCEL_PROJECT_PRODUCTION_URL` is injected by Vercel on every deployment
-  // and is always a host that actually serves this app, so it is the safe
-  // default. `NEXT_PUBLIC_SITE_URL` is still honoured, but only as a fallback
-  // for non-Vercel hosting — a configured domain that does not resolve is
-  // worse than the deployment's own host, because it breaks the card outright.
-  //
-  // Once jova.ng is pointed at Vercel (A/CNAME in DNS), set
-  // NEXT_PUBLIC_SITE_URL back to it and the card will use the branded domain.
-  metadataBase: new URL(
-    process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : process.env.NEXT_PUBLIC_SITE_URL || "https://naijamart-marketplace-opal.vercel.app",
-  ),
-  alternates: {
-    canonical: "/",
-  },
+/**
+ * The absolute origin this page is being served from.
+ *
+ * ── Why this reads the request instead of an env var ──────────────────────
+ * The share card showed an empty image slot, and the cause was not the tags:
+ * `og:image` pointed at `https://jova.ng/og-image.jpg`, and `jova.ng` has no
+ * DNS record at all. Both `NEXT_PUBLIC_SITE_URL` and Vercel's own
+ * `VERCEL_PROJECT_PRODUCTION_URL` were set to that dead domain, so every
+ * scraper was handed a URL it could not fetch and reported "no image".
+ *
+ * No environment variable can be trusted here, because the failure mode is
+ * precisely "the configured domain is not live yet". The request's own `Host`
+ * header cannot be wrong: it is the domain the visitor actually reached, so
+ * the image URL is guaranteed to resolve for the same person who is sharing
+ * the link.
+ *
+ * Order:
+ *   1. `x-forwarded-host` / `host` — the real request host. Always correct.
+ *   2. `NEXT_PUBLIC_SITE_URL` — for a build that renders outside a request
+ *      (a static export, a script).
+ *   3. The Vercel production host, then a literal, as last resorts.
+ *
+ * When jova.ng is pointed at Vercel, this starts emitting jova.ng on its own,
+ * with no code change and no redeploy.
+ */
+function siteOrigin(): string {
+  const h = headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (host) {
+    // https unless this really is a local dev host. Trusting
+    // `x-forwarded-proto` alone is not enough: a proxy that omits it (or a
+    // local `next start`) yields `http`, and an `og:image` on http is either
+    // rejected or triggers a mixed-content warning in the preview.
+    const isLocal = host.startsWith("localhost") || host.startsWith("127.0.0.1");
+    const proto = isLocal ? "http" : "https";
+    return `${proto}://${host}`;
+  }
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+  return "https://naijamart-marketplace-opal.vercel.app";
+}
+
+export function generateMetadata(): Metadata {
+  return {
+    // `metadataBase` turns the relative OG image path below into the absolute
+    // URL that WhatsApp, X and Facebook require. Without it Next emits a
+    // relative `og:image` and every scraper silently drops the preview.
+    metadataBase: new URL(siteOrigin()),
+    alternates: {
+      canonical: "/",
+    },
   title: {
     default: "Jova Marketplace — buy and hire from verified sellers in your state",
     template: "%s · Jova Marketplace",
@@ -115,7 +140,8 @@ export const metadata: Metadata = {
       "Buy and hire from verified sellers in your state. Escrow-protected, so you pay only when you accept.",
     images: [{ url: "/og-image.jpg", alt: "Jova Marketplace" }],
   },
-};
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",
