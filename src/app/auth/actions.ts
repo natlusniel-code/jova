@@ -12,14 +12,16 @@ import { requestClient } from "@/lib/auth/local";
  * against `account_credentials`, the legacy-password migration, the
  * "confirm your email" gate, and the phone-based password reset.
  *
- * All of it is gone. Google is the only way in, so there is no password to
- * check, no account to create from a form, and no password to reset. The
- * Appwrite OTP flow that briefly replaced the mailer is gone with it: no
- * `createEmailToken`, no 6-digit code, no verification screen.
+ * All of it is gone. Sign-in is now handled by Clerk, which offers Google,
+ * Apple, LinkedIn and an emailed one-time code, so there is no password to
+ * check and no password to reset. `bridgeClerkSession`
+ * (`src/app/auth/clerk-actions.ts`) turns a verified Clerk identity into the
+ * Supabase session these helpers run against.
  *
  * What is left is the two things that are still real:
- *   • `completeGoogleProfileAction` — the buyer's last step after Google,
- *     which collects the phone number and LGA that Google does not provide;
+ *   • `completeGoogleProfileAction` — the buyer's last step after any provider
+ *     or code sign-in, which collects the phone number and LGA that no
+ *     identity provider hands us;
  *   • `signOutAction` — clearing the Supabase cookie.
  */
 
@@ -101,9 +103,10 @@ export async function completeGoogleProfileAction(
 /**
  * Clear the Supabase session cookie and go home.
  *
- * The Appwrite session is cleared separately in the browser by
- * `signOutOfAppwrite()` — see `src/components/sign-out-button.tsx`, which is
- * the only sign-out control now that the password flow is gone.
+ * `src/components/sign-out-button.tsx` is the sign-out control users actually
+ * press: it clears the Supabase cookie through `signOutSupabase()` and the
+ * Clerk session through `signOut()` from `useClerk()`. This action remains for
+ * server-side callers that only need the Supabase cookie cleared.
  */
 export async function signOutAction(): Promise<void> {
   const supabase = requestClient();

@@ -1,6 +1,6 @@
 import { AuthSplit } from "@/components/auth-split";
 import { SignInVideo } from "@/components/signin-video";
-import { LoginGlassPanel } from "@/components/login-glass-panel";
+import { ClerkAuthPanel } from "@/components/clerk-auth-panel";
 import { getSession } from "@/lib/supabase/server";
 import { getLoginMedia } from "@/lib/login-media";
 import { redirect } from "next/navigation";
@@ -11,14 +11,21 @@ export const metadata = { title: "Log in" };
 /**
  * `/auth` — the LOGIN page.
  *
- * ── Layout ──────────────────────────────────────────────────────
+ * ── Layout ──────────────────────────────────────────────────────────────────
  * Video first, unchanged: same component, same file, same poster, same silent
- * autoplay behaviour. Directly underneath it sits the Google action, inside a
- * translucent glass card that overlaps the video's bottom edge so the screen
- * reads as one object. Below that, the "Create an account" link — login and
- * sign-up are now two separate pages, and this is the door between them.
+ * autoplay behaviour. Directly underneath it sits the auth panel, which now
+ * offers four ways in — Google, Apple, LinkedIn and an emailed one-time code.
+ * Below that, the "Create an account" link: login and sign-up are two separate
+ * pages, and this is the door between them.
  *
- * ── Why the guard ───────────────────────────────────────────────
+ * ── What changed with Clerk ─────────────────────────────────────────────────
+ * The panel is `ClerkAuthPanel` instead of `LoginGlassPanel`. The old panel
+ * offered Google alone, because Appwrite was the only identity provider wired
+ * up. Clerk brings the other three methods, so the panel grew — but the page
+ * shell, the video, the split layout and the copy are all the same, which is
+ * what keeps the screen recognisably Jova.
+ *
+ * ── Why the guard ───────────────────────────────────────────────────────────
  * `getSession()` runs on the server before anything renders, so a signed-in
  * visitor never sees a login screen and there is no flash of auth UI before
  * the redirect.
@@ -49,23 +56,14 @@ export default async function AuthPage({
   // Someone who already has an account landed on login — that is the happy
   // path here, so nothing to report. `existing` only means something on
   // /signup, and /auth never renders it.
-  const errorMessage = "";
-
   return (
     <AuthSplit>
-      {/* ── Spacing between the video and the actions ────────────────────
-          The video and the glass panel used to be packed together: the
-          panel pulled itself up with `-mt-7` to overlap the video's bottom
-          edge, and the wrapper added only `mb-4`. On a phone that read as
-          one crowded block — the button sat on top of the caption.
-
-          The overlap is gone entirely. The panel now sits below the video
-          with a clear `mt-6` gap, so the video's caption is fully readable
-          and the button has its own space. The glass card still reads as
-          part of the same screen because it shares the video's width and
-          radius, not because it is glued to it. */}
       <SignInVideo src={media.video} poster={media.poster} />
-      <LoginGlassPanel next={next} noAccount={noAccount} errorMessage={errorMessage} />
+      <ClerkAuthPanel
+        mode="signin"
+        next={next}
+        noAccount={noAccount}
+      />
     </AuthSplit>
   );
 }

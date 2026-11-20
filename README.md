@@ -5,6 +5,10 @@ money is released to the seller only when the buyer accepts delivery.
 
 Built with Next.js 14 (App Router), TypeScript, Tailwind and Supabase.
 
+Authentication is **Clerk** (Google, Apple, LinkedIn and email — password or
+one-time code). The marketplace itself still runs on Supabase; see
+[Authentication](#authentication) for how the two fit together.
+
 ---
 
 ## Running it locally
@@ -31,11 +35,85 @@ without:
 
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — the public
   Supabase project.
-- `SUPABASE_SERVICE_ROLE_KEY` — server-only. Used by admin actions and the
-  push dispatcher; never expose it to the browser.
+- `SUPABASE_SERVICE_ROLE_KEY` — server-only. Used by admin actions, the push
+  dispatcher, and the Clerk→Supabase bridge; never expose it to the browser.
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — the public Clerk key. Without it the
+  app still builds and runs, but the auth pages say "sign-in is not
+  configured" instead of offering a form.
+- `CLERK_SECRET_KEY` — server-only. Read by `@clerk/nextjs` itself (not by our
+  code) to verify sessions. Required for any sign-in to work.
 - `NEXT_PUBLIC_SITE_URL` — the canonical origin. This is what makes the Open
   Graph image resolve to an absolute URL, so a wrong value here means share
-  previews break even though the site works.
+  previews break even though the site works. It is also the origin Clerk
+  returns OAuth callbacks to.
+
+---
+
+## Authentication
+
+Clerk is the identity provider. Supabase is still the application database and
+still issues the session cookie every page reads.
+
+### How a sign-in works
+
+1. The person picks a method on `/auth` (login) or `/signup` (create account):
+   Google, Apple, LinkedIn, or email with a password or a one-time code.
+2. Clerk completes the flow and the browser holds a **Clerk** session.
+3. The browser calls `bridgeClerkSession` (`src/app/auth/clerk-actions.ts`).
+   That action reads the identity from the Clerk session **on the server**,
+   finds or creates the matching Supabase user **by email**, and mints a
+   **Supabase** session cookie.
+4. From there the marketplace behaves exactly as before — same cookies, same
+   RLS policies, same role routing.
+
+The bridge is the only place a Jova session can start, and it is why the app
+did not need rewriting when the provider changed.
+
+### Existing Appwrite users
+
+Every account created before this migration signed up through Appwrite with
+Google. Those people have a Supabase row keyed on their Google email and no
+Clerk identity at all. They are not locked out:
+
+- **Google / Apple / LinkedIn** — Clerk automatically transfers an OAuth
+  sign-in with no matching Clerk account into a sign-up, so the first attempt
+  creates their Clerk identity and signs them in.
+- **Email** — the login page tries `signIn` first; when Clerk answers
+  `form_identifier_not_found` it creates the identity and emails a code.
+
+Either way the bridge then matches them to their **existing** Supabase account
+by email, so their profile, role, orders and chats are all intact. They can set
+a password afterwards from the sign-up page if they want one.
+
+### Clerk dashboard setup (one-time)
+
+These are dashboard steps, not environment variables:
+
+| Where | What |
+| --- | --- |
+| Configure → Paths | Sign-in URL `/auth`, Sign-up URL `/signup`, After sign-out `/auth` |
+| Configure → SSO connections | Enable Google, Apple, LinkedIn (OIDC) |
+| Configure → Email | Enable **email code**; enable **password** if you want email + password |
+| Customization → Emails | Set the sender name to **Jova** and write the code message (e.g. `Your Jova sign-in code is {{otp_code}}`) |
+| Customization → Emails → Custom domain | Optional, needs a paid plan: send from `no-reply@naijamart.ng` instead of Clerk's shared sender |
+| Each SSO provider | Allowed redirect URL `<NEXT_PUBLIC_SITE_URL>/auth/sso-callback` (plus `http://localhost:3000/auth/sso-callback` for local dev) |
+
+The custom sender name and message are free on the development instance. The
+custom sending domain requires a paid Clerk plan and DNS records on that
+domain; until it is set up, codes come from Clerk's own verified sender.
+
+### Where the code lives
+
+| File | Role |
+| --- | --- |
+| `src/lib/clerk/config.ts` | Publishable key, canonical origin, the provider list |
+| `src/lib/clerk/appearance.ts` | Clerk's own UI dressed in Jova's theme |
+| `src/lib/clerk/bridge.ts` | Clerk identity → Supabase user (find or create by email) |
+| `src/app/auth/clerk-actions.ts` | The server action that mints the Supabase session |
+| `src/components/clerk-auth-panel.tsx` | The auth UI — providers, password, code |
+| `src/app/auth/sso-callback/page.tsx` | OAuth handshake return |
+| `src/app/auth/continue/page.tsx` | Mints the session after an OAuth round trip |
+| `src/middleware.ts` | `clerkMiddleware` wrapping the Supabase refresh + admin gate |
 
 ### Database
 

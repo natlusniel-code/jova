@@ -1,10 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { headers } from "next/headers";
+import { ClerkProvider } from "@clerk/nextjs";
 import { INSTALL_CAPTURE_SCRIPT } from "@/lib/install-capture";
 import { GlobalLoader } from "@/components/global-loader";
 import { GlobalLoaderTriggers } from "@/components/global-loader-triggers";
 import { NotificationBridge } from "@/components/notification-bridge";
+import { CLERK_PUBLISHABLE_KEY, CLERK_CONFIGURED } from "@/lib/clerk/config";
+import { clerkAppearance } from "@/lib/clerk/appearance";
 import "./globals.css";
 // Responsive guards, imported separately so globals.css stays as it was.
 import "./responsive-guards.css";
@@ -151,7 +154,17 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
+  // ── Why the provider is conditional ────────────────────────────────────────
+  // `ClerkProvider` THROWS at render time when it has no publishable key
+  // ("Missing publishableKey"). That would make `next build` fail on any host
+  // that has not been given the key yet — including a fresh clone and CI — and
+  // it would take the whole site down, not just the auth pages.
+  //
+  // So the provider is mounted only when a key exists. Without one the app
+  // still builds and every non-auth page still renders; the auth panel shows a
+  // clear "sign-in is not configured" notice instead of a blank crash. That is
+  // the same fail-loudly-but-stay-up rule the Supabase config follows.
+  const tree = (
     <html lang="en">
       <head>
         {/*
@@ -197,5 +210,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
       </body>
     </html>
+  );
+
+  if (!CLERK_CONFIGURED) return tree;
+
+  return (
+    <ClerkProvider
+      publishableKey={CLERK_PUBLISHABLE_KEY}
+      appearance={clerkAppearance}
+      // The auth pages are the only place Clerk's own UI can appear (the
+      // "continue" screens during an OAuth handshake). Sending those to our
+      // own pages keeps the person inside Jova's design instead of landing on
+      // a hosted Clerk screen.
+      signInUrl="/auth"
+      signUpUrl="/signup"
+      afterSignOutUrl="/auth"
+    >
+      {tree}
+    </ClerkProvider>
   );
 }
