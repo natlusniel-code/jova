@@ -82,7 +82,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
   // current URL on its own.
   const isSeller = !!session && isSellerAccount(session.profile, session.shop);
   if (isSeller) {
-    const pathname = headers().get("x-pathname") ?? "";
+    const pathname = (await headers()).get("x-pathname") ?? "";
     if (!sellerMayView(pathname, session.shop?.slug)) redirect("/seller");
   }
 

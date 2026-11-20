@@ -35,11 +35,13 @@ import { CLERK_CONFIGURED } from "@/lib/clerk/config";
  * link that resolves it. So both are sent back to their origin page as a query
  * flag rather than drawn on this spinner screen, which has no context.
  */
-export default function AuthContinuePage({
-  searchParams,
+export default async function AuthContinuePage({
+  searchParams: searchParamsPromise,
 }: {
-  searchParams?: { mode?: string; role?: string; next?: string };
+  // Next 15: search params arrive as a Promise.
+  searchParams: Promise<{ mode?: string; role?: string; next?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   // Without a Clerk key there is no provider, so `useClerk` below would throw.
   // There is also nothing to continue — no OAuth round trip can have started.
   if (!CLERK_CONFIGURED) {

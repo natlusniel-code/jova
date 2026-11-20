@@ -87,7 +87,13 @@ function Icon({ name, className }: { name: string; className?: string }) {
   }
 }
 
-export default async function HomePage({ searchParams }: { searchParams: SP }) {
+export default async function HomePage({
+  searchParams: searchParamsPromise,
+}: {
+  // Next 15: search params arrive as a Promise.
+  searchParams: Promise<SP>;
+}) {
+  const searchParams = await searchParamsPromise;
   const session = await getSession();
   const myCity = session?.profile.city ?? null;
   const myState = session?.profile.state ?? null;
@@ -110,7 +116,7 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
   // no id, so the seed is derived from the request headers — hashed, never
   // stored — which keeps the row steady across a few page loads without
   // recording anything about the person. See src/lib/stable-random.ts.
-  const hdrs = headers();
+  const hdrs = await headers();
   const shopSeed =
     session?.user.id ??
     anonymousSeed([hdrs.get("user-agent"), hdrs.get("accept-language")]);

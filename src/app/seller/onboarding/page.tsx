@@ -20,10 +20,12 @@ export const metadata = { title: "Seller onboarding" };
  * the redirect would loop.
  */
 export default async function OnboardingPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams: { step?: string };
+  // Next 15: search params arrive as a Promise.
+  searchParams: Promise<{ step?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const session = await getSession();
   const [categories, settings, plans] = await Promise.all([
     getCategories(),

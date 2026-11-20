@@ -6,12 +6,15 @@ import { shopHasFeature } from "@/lib/plan-gate";
 export const dynamic = "force-dynamic";
 
 export default async function ChatPage({
-  params,
-  searchParams,
+  params: paramsPromise,
+  searchParams: searchParamsPromise,
 }: {
-  params: { id: string };
-  searchParams?: { draft?: string; pkgs?: string };
+  // Next 15: route params and search params arrive as Promises.
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ draft?: string; pkgs?: string }>;
 }) {
+  const params = await paramsPromise;
+  const searchParams = await searchParamsPromise;
   const session = await getSession();
   if (!session) redirect(`/signin?next=%2Fchats%2F${params.id}`);
 

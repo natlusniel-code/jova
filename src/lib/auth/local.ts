@@ -110,13 +110,16 @@ export async function mintSession(email: string): Promise<void> {
 
   if (!hashed) throw new Error("Could not start a session: no token was issued.");
 
-  const cookieStore = cookies();
+  // Next 15: `cookies()` is async. The adapter below is async too, so the
+  // `await` stays here and `requestClient()` / `mintSession()` keep their
+  // existing signatures for every caller.
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
-      getAll() {
-        return cookieStore.getAll();
+      async getAll() {
+        return (await cookies()).getAll();
       },
-      setAll(cookiesToSet: CookieToSet[]) {
+      async setAll(cookiesToSet: CookieToSet[]) {
+        const cookieStore = await cookies();
         cookiesToSet.forEach(({ name, value, options }) => {
           cookieStore.set(name, value, options);
         });
@@ -133,14 +136,14 @@ export async function mintSession(email: string): Promise<void> {
 
 /** The SSR client bound to the current request's cookies. */
 export function requestClient() {
-  const cookieStore = cookies();
   return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
-      getAll() {
-        return cookieStore.getAll();
+      async getAll() {
+        return (await cookies()).getAll();
       },
-      setAll(cookiesToSet: CookieToSet[]) {
+      async setAll(cookiesToSet: CookieToSet[]) {
         try {
+          const cookieStore = await cookies();
           cookiesToSet.forEach(({ name, value, options }) => {
             cookieStore.set(name, value, options);
           });

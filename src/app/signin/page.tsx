@@ -15,11 +15,13 @@ export const metadata = { title: "Sign in" };
  * those links working and lands the person on the one screen that can actually
  * sign them in, with their `next` destination preserved.
  */
-export default function SignInPage({
-  searchParams,
+export default async function SignInPage({
+  searchParams: searchParamsPromise,
 }: {
-  searchParams?: { next?: string };
+  // Next 15: search params arrive as a Promise.
+  searchParams: Promise<{ next?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const raw = searchParams?.next ?? "";
   const next = raw.startsWith("/") && !raw.startsWith("//") ? raw : "";
   redirect(next ? `/auth?next=${encodeURIComponent(next)}` : "/auth");

@@ -3,7 +3,8 @@
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
+import { useSignIn, useSignUp } from "@clerk/nextjs";
+import type { OAuthStrategy } from "@clerk/nextjs/types";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { OAUTH_PROVIDERS, oauthOrigin, CLERK_CONFIGURED } from "@/lib/clerk/config";
 import { bridgeClerkSession } from "@/app/auth/clerk-actions";
@@ -101,9 +102,13 @@ function ClerkAuthPanelInner({
   existing?: boolean;
 }) {
   const router = useRouter();
-  const { setActive } = useClerk();
-  const { signIn, isLoaded: signInLoaded } = useSignIn();
-  const { signUp, isLoaded: signUpLoaded } = useSignUp();
+  // Clerk 7's hooks return a signal: `{ signIn, errors, fetchStatus }`. There is
+  // no `isLoaded` any more — readiness is `fetchStatus === "idle"`, and the
+  // resource object is always present. The resource is mutated in place by its
+  // own methods, so reading `signIn.status` right after an `await` is the
+  // documented way to branch on the outcome.
+  const { signIn, fetchStatus: signInStatus } = useSignIn();
+  const { signUp, fetchStatus: signUpStatus } = useSignUp();
 
   const [role, setRole] = useState<Role | null>(initialRole);
   const [email, setEmail] = useState("");
@@ -126,7 +131,7 @@ function ClerkAuthPanelInner({
   const [error, setError] = useState("");
 
   const isSignup = mode === "signup";
-  const ready = signInLoaded && signUpLoaded;
+  const ready = signInStatus === "idle" && signUpStatus === "idle";
 
   /** Turn a Clerk error into one readable sentence. */
   const readError = useCallback((e: unknown, fallback: string) => {
@@ -135,6 +140,21 @@ function ClerkAuthPanelInner({
       return first?.longMessage || first?.message || fallback;
     }
     return e instanceof Error ? e.message : fallback;
+  }, []);
+
+  /**
+   * The machine-readable code on a Clerk error, e.g. `form_identifier_not_found`.
+   *
+   * Clerk 7 returns errors as values (`{ error }`) rather than throwing them, so
+   * the code is read off the returned object. `isClerkAPIResponseError` covers
+   * the API-shaped ones; the plain `code` fallback covers the rest.
+   */
+  const errorCode = useCallback((e: unknown): string => {
+    if (isClerkAPIResponseError(e)) return e.errors?.[0]?.code ?? "";
+    if (e && typeof e === "object" && "code" in e) {
+      return String((e as { code?: unknown }).code ?? "");
+    }
+    return "";
   }, []);
 
   /**
@@ -189,8 +209,13 @@ function ClerkAuthPanelInner({
     if (next) params.set("next", next);
 
     const origin = oauthOrigin(window.location.origin);
-    const redirectUrl = `${origin}/auth/sso-callback`;
-    const redirectUrlComplete = `${origin}/auth/continue?${params.toString()}`;
+    // Clerk 7 splits the two destinations apart:
+    //   `redirectCallbackUrl` — where the provider returns (the handshake page);
+    //   `redirectUrl`         — where a completed session lands (the bridge).
+    // The intent rides on BOTH, because the handshake page is a fresh page load
+    // with no React state and has to forward it on to the bridge.
+    const redirectCallbackUrl = `${origin}/auth/sso-callback?${params.toString()}`;
+    const redirectUrl = `${origin}/auth/continue?${params.toString()}`;
 
     try {
       // ── Why BOTH pages start a SIGN-IN ────────────────────────────────────
@@ -217,12 +242,31 @@ function ClerkAuthPanelInner({
       // is enforced on the server, in `bridgeClerkSession`, which refuses a
       // LOGIN for an email that has no Supabase account. So the login page
       // still cannot create a Jova account; it can only prove an identity.
-      await signIn!.authenticateWithRedirect({
-        strategy: strategy as never,
+      const { error: ssoError } = await signIn.sso({
+        strategy: strategy as OAuthStrategy,
         redirectUrl,
-        redirectUrlComplete,
+        redirectCallbackUrl,
       });
-      // The browser is navigating to the provider. Leave the spinner up.
+
+      if (ssoError) {
+        setBusy(null);
+        setError(readError(ssoError, `We could not reach ${label}. Please try again.`));
+        return;
+      }
+
+      // A second factor (or device trust) means Clerk did NOT navigate. Say so
+      // rather than leaving a spinner that will never resolve.
+      if (
+        signIn.status === "needs_second_factor" ||
+        signIn.status === "needs_client_trust"
+      ) {
+        setBusy(null);
+        setError(
+          "Your account needs a second step. Use \u201cEmail me a code\u201d below to finish signing in.",
+        );
+        return;
+      }
+      // Otherwise the browser is navigating to the provider. Leave the spinner up.
     } catch (e) {
       setBusy(null);
       setError(readError(e, `We could not reach ${label}. Please try again.`));
@@ -255,20 +299,33 @@ function ClerkAuthPanelInner({
       // the message below points them at the code option, which is the way in
       // for them. Creating an account here would be wrong: the login page must
       // not be able to create one.
-      const attempt = await signIn!.create({
+      const { error: pwError } = await signIn.password({
         identifier: address,
         password,
       });
 
-      if (attempt.status === "complete") {
-        await setActive({ session: attempt.createdSessionId });
+      if (pwError) {
+        setBusy(null);
+        setError(
+          readError(
+            pwError,
+            "That email and password did not match. Check them, or use “Email me a code”.",
+          ),
+        );
+        return;
+      }
+
+      if (signIn.status === "complete") {
+        // `finalize()` is what actually sets the active session in Clerk 7 —
+        // the old `setActive({ session: createdSessionId })` is gone.
+        await signIn.finalize();
         await finish({ mode, role });
         return;
       }
 
       // A second factor is configured on the instance. Send them to the code
       // step rather than leaving them on a spinner with no explanation.
-      if (attempt.status === "needs_second_factor") {
+      if (signIn.status === "needs_second_factor") {
         setBusy(null);
         setError(
           "Your account needs a second step. Use “Email me a code” below to finish signing in.",
@@ -308,12 +365,17 @@ function ClerkAuthPanelInner({
     setBusy("password");
 
     try {
-      await signUp!.create({ emailAddress: address, password });
+      const { error: createError } = await signUp.create({
+        emailAddress: address,
+        password,
+      });
+      if (createError) throw createError;
 
       // Clerk emails a verification code for the new address. The account is
       // not usable until it is verified, so the code step is mandatory here —
       // it is not an optional second factor.
-      await signUp!.prepareVerification({ strategy: "email_code" });
+      const { error: sendError } = await signUp.verifications.sendEmailCode();
+      if (sendError) throw sendError;
 
       setCodeFlow("signup");
       setStep("code");
@@ -370,45 +432,37 @@ function ClerkAuthPanelInner({
       let startedAsSignUp = false;
 
       if (isSignup) {
-        await signUp!.create({ emailAddress: address });
-        await signUp!.prepareVerification({ strategy: "email_code" });
+        const { error: createError } = await signUp.create({
+          emailAddress: address,
+        });
+        if (createError) throw createError;
+        const { error: sendError } = await signUp.verifications.sendEmailCode();
+        if (sendError) throw sendError;
         startedAsSignUp = true;
       } else {
-        try {
-          const attempt = await signIn!.create({ identifier: address });
-          if (attempt.status === "complete") {
-            await setActive({ session: attempt.createdSessionId });
-            await finish({ mode, role });
-            return;
-          }
+        const { error: createError } = await signIn.create({
+          identifier: address,
+        });
 
-          // The address is known to Clerk but a factor is still required.
-          // `emailAddressId` is the identifier the factor belongs to; it is on
-          // the attempt's supported factor and is required by Clerk's types,
-          // so it is read from there rather than guessed.
-          const emailFactor = attempt.supportedFirstFactors?.find(
-            (f) => f.strategy === "email_code",
-          );
-          await signIn!.prepareFirstFactor({
-            strategy: "email_code",
-            emailAddressId:
-              (emailFactor as { emailAddressId?: string })?.emailAddressId ??
-              "",
-          });
-        } catch (signInError) {
-          if (!isClerkAPIResponseError(signInError)) throw signInError;
-
-          const code = signInError.errors?.[0]?.code ?? "";
-          const unknownIdentifier = /identifier_not_found|form_identifier/i.test(
-            code,
-          );
-          if (!unknownIdentifier) throw signInError;
+        if (createError) {
+          const code = errorCode(createError);
+          const unknownIdentifier = /identifier_not_found|form_identifier/i.test(code);
+          if (!unknownIdentifier) throw createError;
 
           // Not in Clerk yet — an existing Jova/Appwrite user. Create the
           // Clerk identity so they can verify this address and get in.
-          await signUp!.create({ emailAddress: address });
-          await signUp!.prepareVerification({ strategy: "email_code" });
+          const { error: suError } = await signUp.create({
+            emailAddress: address,
+          });
+          if (suError) throw suError;
+          const { error: sendError } = await signUp.verifications.sendEmailCode();
+          if (sendError) throw sendError;
           startedAsSignUp = true;
+        } else {
+          // The address is known to Clerk. `sendCode()` with no arguments
+          // targets the identifier the sign-in was just created with.
+          const { error: sendError } = await signIn.emailCode.sendCode();
+          if (sendError) throw sendError;
         }
       }
 
@@ -446,27 +500,27 @@ function ClerkAuthPanelInner({
 
     try {
       if (codeFlow === "signup") {
-        const result = await signUp!.attemptVerification({
-          strategy: "email_code",
+        const { error: verifyError } = await signUp.verifications.verifyEmailCode({
           code: value,
         });
-        if (result.status !== "complete") {
+        if (verifyError) throw verifyError;
+        if (signUp.status !== "complete") {
           setBusy(null);
           setError("That code did not work. Check it and try again.");
           return;
         }
-        await setActive({ session: result.createdSessionId });
+        await signUp.finalize();
       } else {
-        const result = await signIn!.attemptFirstFactor({
-          strategy: "email_code",
+        const { error: verifyError } = await signIn.emailCode.verifyCode({
           code: value,
         });
-        if (result.status !== "complete") {
+        if (verifyError) throw verifyError;
+        if (signIn.status !== "complete") {
           setBusy(null);
           setError("That code did not work. Check it and try again.");
           return;
         }
-        await setActive({ session: result.createdSessionId });
+        await signIn.finalize();
       }
 
       await finish({ mode, role });

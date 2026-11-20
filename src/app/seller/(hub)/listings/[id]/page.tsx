@@ -8,7 +8,13 @@ import { shopHasFeature } from "@/lib/plan-gate";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Edit listing" };
 
-export default async function EditListingPage({ params }: { params: { id: string } }) {
+export default async function EditListingPage({
+  params: paramsPromise,
+}: {
+  // Next 15: route params arrive as a Promise.
+  params: Promise<{ id: string }>;
+}) {
+  const params = await paramsPromise;
   const session = await getSession();
   if (!session?.shop) redirect("/seller/onboarding");
 

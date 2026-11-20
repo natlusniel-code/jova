@@ -11,7 +11,13 @@ import { supportWhatsAppUrl } from "@/lib/support";
 
 export const dynamic = "force-dynamic";
 
-export default async function OrderDetailPage({ params }: { params: { id: string } }) {
+export default async function OrderDetailPage({
+  params: paramsPromise,
+}: {
+  // Next 15: route params arrive as a Promise.
+  params: Promise<{ id: string }>;
+}) {
+  const params = await paramsPromise;
   const session = await getSession();
   if (!session) redirect(`/signin?next=%2Forders%2F${params.id}`);
 

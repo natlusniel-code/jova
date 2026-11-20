@@ -1,4 +1,7 @@
-import type { Appearance } from "@clerk/types";
+// Clerk 7 no longer ships a separate `@clerk/types` package — the types are
+// re-exported from the SDK itself. `ClerkAppearanceTheme` is the name the
+// `appearance` prop takes on `ClerkProvider` in this version.
+import type { ClerkAppearanceTheme } from "@clerk/nextjs/types";
 
 /**
  * Clerk's own UI, dressed as Jova.
@@ -23,14 +26,18 @@ import type { Appearance } from "@clerk/types";
  * internal class names would break on any Clerk release; the variables are
  * stable, so this keeps working across upgrades.
  */
-export const clerkAppearance: Appearance = {
+export const clerkAppearance: ClerkAppearanceTheme = {
   variables: {
+    // Clerk 7 renamed the theme variables: `colorText` → `colorForeground`,
+    // `colorTextSecondary` → `colorMutedForeground`, `colorInputBackground` →
+    // `colorInput`, `colorInputText` → `colorInputForeground`, and
+    // `spacingUnit` → `spacing`. Same colours, current names.
     colorPrimary: "#0B7A45",
-    colorText: "#0f172a",
-    colorTextSecondary: "#64748b",
+    colorForeground: "#0f172a",
+    colorMutedForeground: "#64748b",
     colorBackground: "#ffffff",
-    colorInputBackground: "#ffffff",
-    colorInputText: "#0f172a",
+    colorInput: "#ffffff",
+    colorInputForeground: "#0f172a",
     colorDanger: "#b42318",
     colorSuccess: "#0B7A45",
     colorWarning: "#b45309",
@@ -38,7 +45,7 @@ export const clerkAppearance: Appearance = {
     fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
     fontFamilyButtons: "Inter, ui-sans-serif, system-ui, sans-serif",
     fontSize: "14.5px",
-    spacingUnit: "1rem",
+    spacing: "1rem",
   },
   elements: {
     // The handshake card: same radius, border and shadow as `nm-card`.

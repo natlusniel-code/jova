@@ -8,10 +8,12 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Orders ledger" };
 
 export default async function AdminOrdersPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams: { status?: string; q?: string };
+  // Next 15: search params arrive as a Promise.
+  searchParams: Promise<{ status?: string; q?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const supabase = createAdminClient();
   const { data: orders } = await supabase
     .from("orders")

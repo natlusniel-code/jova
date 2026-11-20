@@ -3,7 +3,7 @@
 A Nigerian marketplace for goods and services. Buyers pay into escrow and the
 money is released to the seller only when the buyer accepts delivery.
 
-Built with Next.js 14 (App Router), TypeScript, Tailwind and Supabase.
+Built with Next.js 15 (App Router), TypeScript, Tailwind and Supabase.
 
 Authentication is **Clerk** (Google, Apple, LinkedIn and email — password or
 one-time code). The marketplace itself still runs on Supabase; see
@@ -114,6 +114,25 @@ domain; until it is set up, codes come from Clerk's own verified sender.
 | `src/app/auth/sso-callback/page.tsx` | OAuth handshake return |
 | `src/app/auth/continue/page.tsx` | Mints the session after an OAuth round trip |
 | `src/middleware.ts` | `clerkMiddleware` wrapping the Supabase refresh + admin gate |
+
+### SDK versions
+
+`@clerk/nextjs` **7.10.6** and `next` **15.5.29**, both pinned exactly.
+
+Clerk 7 is the version that matches the Clerk instance. Older SDKs are refused
+by the instance at sign-in time with *"This app uses an outdated version of
+Clerk"*, so this pair must not be downgraded independently: Clerk 7 requires
+Next 15.2.8 or newer, and Next 15 is what made `cookies()`, `headers()`,
+`params` and `searchParams` asynchronous.
+
+Two consequences worth knowing before editing:
+
+- **Route params and search params are Promises.** Every page reads them as
+  `const params = await paramsPromise`. Adding a new page means awaiting them
+  too, or the build fails its type check.
+- **`createClient()` in `src/lib/supabase/server.ts` stays synchronous.** The
+  `await cookies()` lives inside the `@supabase/ssr` cookie adapter, which is
+  allowed to be async, so the ~130 call sites did not have to change.
 
 ### Database
 

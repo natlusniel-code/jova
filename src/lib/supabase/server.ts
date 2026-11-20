@@ -10,21 +10,32 @@ type CookieToSet = {
   options?: Record<string, unknown>;
 };
 
-/** Server-side Supabase client. RLS is always in effect — this key is the anon key. */
+/**
+ * Server-side Supabase client. RLS is always in effect — this key is the anon key.
+ *
+ * ── Why the cookie adapter is async, not the factory ────────────────────────
+ * Next 15 made `cookies()` return a Promise. The obvious fix — make this
+ * function `async` — would have forced `await` onto every one of the ~130 call
+ * sites across the app, for no benefit: nothing here needs the cookie store
+ * until a query actually runs.
+ *
+ * `@supabase/ssr`'s `getAll` / `setAll` are allowed to return promises, so the
+ * `await` lives inside the adapter instead. `createClient()` stays synchronous
+ * and every existing caller keeps working unchanged.
+ */
 export function createClient() {
-  const cookieStore = cookies();
-
   return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
       // getAll/setAll is the current @supabase/ssr cookie adapter. The older
       // get/set/remove trio is deprecated and mishandles chunked cookies —
       // large session tokens are split across `sb-...auth-token.0`, `.1`, …
       // and a per-name `get` returns only the first chunk.
-      getAll() {
-        return cookieStore.getAll();
+      async getAll() {
+        return (await cookies()).getAll();
       },
-      setAll(cookiesToSet: CookieToSet[]) {
+      async setAll(cookiesToSet: CookieToSet[]) {
         try {
+          const cookieStore = await cookies();
           cookiesToSet.forEach(({ name, value, options }) =>
             cookieStore.set(name, value, options),
           );

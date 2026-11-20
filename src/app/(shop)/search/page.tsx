@@ -17,7 +17,13 @@ type SP = {
   mode?: string;
 };
 
-export default async function SearchPage({ searchParams }: { searchParams: SP }) {
+export default async function SearchPage({
+  searchParams: searchParamsPromise,
+}: {
+  // Next 15: search params arrive as a Promise.
+  searchParams: Promise<SP>;
+}) {
+  const searchParams = await searchParamsPromise;
   const session = await getSession();
   const myCity = session?.profile.city ?? null;
 

@@ -33,7 +33,13 @@ type SP = { city?: string; page?: string; mode?: string };
  * the database function, not here, so search and the storefront cannot
  * disagree about it.
  */
-export default async function ServicesPage({ searchParams }: { searchParams: SP }) {
+export default async function ServicesPage({
+  searchParams: searchParamsPromise,
+}: {
+  // Next 15: search params arrive as a Promise.
+  searchParams: Promise<SP>;
+}) {
+  const searchParams = await searchParamsPromise;
   const session = await getSession();
   const myCity = session?.profile.city ?? null;
 

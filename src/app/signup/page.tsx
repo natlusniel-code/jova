@@ -29,11 +29,13 @@ export const metadata = { title: "Create your account" };
  * `?next=` is a same-origin path only, so it can never become an open
  * redirect.
  */
-export default function SignupPage({
-  searchParams,
+export default async function SignupPage({
+  searchParams: searchParamsPromise,
 }: {
-  searchParams?: { role?: string; next?: string; existing?: string };
+  // Next 15: search params arrive as a Promise.
+  searchParams: Promise<{ role?: string; next?: string; existing?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const initialRole =
     searchParams?.role === "seller"
       ? ("seller" as const)

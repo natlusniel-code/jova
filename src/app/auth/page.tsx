@@ -31,14 +31,16 @@ export const metadata = { title: "Log in" };
  * the redirect.
  */
 export default async function AuthPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams?: {
+  // Next 15: search params arrive as a Promise.
+  searchParams: Promise<{
     next?: string;
     noaccount?: string;
     existing?: string;
-  };
+  }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const session = await getSession();
   if (session) redirect("/dashboard");
 

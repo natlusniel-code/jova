@@ -27,7 +27,13 @@ type SP = { upgrade?: string; renew?: string; pending?: string };
  * The price is read from `seller_plans`, which the admin edits — so the
  * number on this page is whatever the admin set, not a constant.
  */
-export default async function SubscriptionPage({ searchParams }: { searchParams: SP }) {
+export default async function SubscriptionPage({
+  searchParams: searchParamsPromise,
+}: {
+  // Next 15: search params arrive as a Promise.
+  searchParams: Promise<SP>;
+}) {
+  const searchParams = await searchParamsPromise;
   const session = await getSession();
   if (!session?.shop) redirect("/seller/onboarding");
 

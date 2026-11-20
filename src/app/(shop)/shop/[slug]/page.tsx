@@ -32,7 +32,13 @@ export const dynamic = "force-dynamic";
  * paths, and Supabase storage URLs are already absolute, so they pass through
  * untouched.
  */
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata({
+  params: paramsPromise,
+}: {
+  // Next 15: route params arrive as a Promise.
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const params = await paramsPromise;
   const shop = await getShopBySlug(params.slug);
   if (!shop) return { title: "Shop not found" };
 
@@ -55,7 +61,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   // `metadataBase` is set, and this app has no single canonical host (Vercel
   // preview, custom domain, localhost), so it is resolved from the request
   // headers here. Falls back to the production domain.
-  const h = headers();
+  const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   const proto = h.get("x-forwarded-proto") ?? (host?.startsWith("localhost") ? "http" : "https");
   const origin = host ? `${proto}://${host}` : "https://naijamart-marketplace-opal.vercel.app";
@@ -84,7 +90,13 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function ShopPage({ params }: { params: { slug: string } }) {
+export default async function ShopPage({
+  params: paramsPromise,
+}: {
+  // Next 15: route params arrive as a Promise.
+  params: Promise<{ slug: string }>;
+}) {
+  const params = await paramsPromise;
   const session = await getSession();
   const shop = await getShopBySlug(params.slug);
   if (!shop) notFound();

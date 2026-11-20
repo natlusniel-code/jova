@@ -19,7 +19,13 @@ export const metadata = { title: "Chat" };
  * own — a seller must not be able to open another seller's conversation by
  * guessing an id.
  */
-export default async function SellerChatPage({ params }: { params: { id: string } }) {
+export default async function SellerChatPage({
+  params: paramsPromise,
+}: {
+  // Next 15: route params arrive as a Promise.
+  params: Promise<{ id: string }>;
+}) {
+  const params = await paramsPromise;
   const session = await getSession();
   if (!session) redirect(`/signin?next=%2Fseller%2Fchats%2F${params.id}`);
 

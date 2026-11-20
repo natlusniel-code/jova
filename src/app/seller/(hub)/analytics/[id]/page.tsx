@@ -14,7 +14,13 @@ export const dynamic = "force-dynamic";
  * Without the image at the top, a seller with twelve similar gigs cannot
  * tell which page they opened.
  */
-export default async function ListingAnalyticsPage({ params }: { params: { id: string } }) {
+export default async function ListingAnalyticsPage({
+  params: paramsPromise,
+}: {
+  // Next 15: route params arrive as a Promise.
+  params: Promise<{ id: string }>;
+}) {
+  const params = await paramsPromise;
   const session = await getSession();
   if (!session) redirect("/signin");
   if (!session.shop) redirect("/seller/onboarding");

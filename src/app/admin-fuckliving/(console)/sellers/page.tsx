@@ -9,7 +9,13 @@ import { ModerationControls } from "@/components/admin/moderation-controls";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Sellers" };
 
-export default async function AdminSellersPage({ searchParams }: { searchParams: { tab?: string } }) {
+export default async function AdminSellersPage({
+  searchParams: searchParamsPromise,
+}: {
+  // Next 15: search params arrive as a Promise.
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const searchParams = await searchParamsPromise;
   const tab = searchParams.tab ?? "applications";
   const supabase = createAdminClient();
 

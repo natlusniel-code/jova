@@ -19,10 +19,12 @@ const TABS = [
 ];
 
 export default async function OrdersPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams: { tab?: string; placed?: string };
+  // Next 15: search params arrive as a Promise.
+  searchParams: Promise<{ tab?: string; placed?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const session = await getSession();
   if (!session) redirect("/signin?next=%2Forders");
 

@@ -17,7 +17,13 @@ import { getWishlistIds } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
-export default async function ListingPage({ params }: { params: { id: string } }) {
+export default async function ListingPage({
+  params: paramsPromise,
+}: {
+  // Next 15: route params arrive as a Promise.
+  params: Promise<{ id: string }>;
+}) {
+  const params = await paramsPromise;
   const session = await getSession();
   const l = await getListing(params.id);
   if (!l) notFound();

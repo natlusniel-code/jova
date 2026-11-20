@@ -17,7 +17,13 @@ const TABS = [
   { key: "cancelled", label: "Cancelled" },
 ];
 
-export default async function SellerOrdersPage({ searchParams }: { searchParams: { tab?: string } }) {
+export default async function SellerOrdersPage({
+  searchParams: searchParamsPromise,
+}: {
+  // Next 15: search params arrive as a Promise.
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const searchParams = await searchParamsPromise;
   const session = await getSession();
   if (!session) redirect("/signin");
   if (!session.shop) redirect("/seller/onboarding");
