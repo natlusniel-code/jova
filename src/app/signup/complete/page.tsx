@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AuthSplit } from "@/components/auth-split";
 import { getSession } from "@/lib/supabase/server";
+import { hasClerkSessionWithoutJova } from "@/lib/auth/resume";
 import { CompleteProfile } from "@/components/signup/complete-profile";
 
 export const dynamic = "force-dynamic";
@@ -26,8 +27,15 @@ export const metadata = { title: "Finish your account" };
 export default async function SignupCompletePage() {
   const session = await getSession();
 
-  // No session: the Google round trip did not complete. Start again.
-  if (!session) redirect("/auth");
+  // No session: the round trip did not complete. If Clerk still holds a
+  // session, finish it rather than bouncing to the login form — that bounce is
+  // what made a half-finished sign-in look like a redirect loop.
+  if (!session) {
+    if (await hasClerkSessionWithoutJova()) {
+      redirect("/auth/resume?next=%2Fsignup%2Fcomplete");
+    }
+    redirect("/auth?next=%2Fsignup%2Fcomplete");
+  }
 
   // Already complete — nothing to collect. Sellers have their own flow.
   if (session.profile.phone && session.profile.city) {

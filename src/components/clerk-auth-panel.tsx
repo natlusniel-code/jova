@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSignIn, useSignUp } from "@clerk/nextjs";
+import { useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
 import type { OAuthStrategy } from "@clerk/nextjs/types";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { OAUTH_PROVIDERS, oauthOrigin, CLERK_CONFIGURED } from "@/lib/clerk/config";
@@ -55,6 +55,7 @@ export function ClerkAuthPanel(props: {
   initialRole?: Role | null;
   noAccount?: boolean;
   existing?: boolean;
+  clearStaleSession?: boolean;
 }) {
   if (!CLERK_CONFIGURED) return <ClerkNotConfigured />;
   return <ClerkAuthPanelInner {...props} />;
@@ -94,12 +95,14 @@ function ClerkAuthPanelInner({
   initialRole = null,
   noAccount = false,
   existing = false,
+  clearStaleSession = false,
 }: {
   mode: Mode;
   next?: string;
   initialRole?: Role | null;
   noAccount?: boolean;
   existing?: boolean;
+  clearStaleSession?: boolean;
 }) {
   const router = useRouter();
   // Clerk 7's hooks return a signal: `{ signIn, errors, fetchStatus }`. There is
@@ -109,6 +112,28 @@ function ClerkAuthPanelInner({
   // documented way to branch on the outcome.
   const { signIn, fetchStatus: signInStatus } = useSignIn();
   const { signUp, fetchStatus: signUpStatus } = useSignUp();
+  const { signOut } = useClerk();
+
+  /**
+   * Clear a stale Clerk session before starting a new sign-up.
+   *
+   * `/auth/resume` sends a person here with `fresh=1` when their Clerk identity
+   * has no Jova account. Clerk still holds that session, and it will refuse to
+   * start a sign-up while it is active — so it has to go first. Without this
+   * the form would look fine and every button would fail.
+   *
+   * Runs once, on mount, and only in that case. `signOut()` clears the Clerk
+   * cookie; the Supabase cookie is already absent (that is why we are here).
+   */
+  const cleared = useRef(false);
+  useEffect(() => {
+    if (!clearStaleSession || cleared.current) return;
+    cleared.current = true;
+    void signOut().catch(() => {
+      // A failure here is not fatal: the sign-up attempt below will report the
+      // real problem if the session is still active.
+    });
+  }, [clearStaleSession, signOut]);
 
   const [role, setRole] = useState<Role | null>(initialRole);
   const [email, setEmail] = useState("");
@@ -211,11 +236,16 @@ function ClerkAuthPanelInner({
     const origin = oauthOrigin(window.location.origin);
     // Clerk 7 splits the two destinations apart:
     //   `redirectCallbackUrl` — where the provider returns (the handshake page);
-    //   `redirectUrl`         — where a completed session lands (the bridge).
-    // The intent rides on BOTH, because the handshake page is a fresh page load
-    // with no React state and has to forward it on to the bridge.
-    const redirectCallbackUrl = `${origin}/auth/sso-callback?${params.toString()}`;
-    const redirectUrl = `${origin}/auth/continue?${params.toString()}`;
+    //   `redirectUrl`         — where a completed session lands.
+    //
+    // Both point at the SAME page now. The handshake page completes the OAuth
+    // exchange AND mints the Jova session in one load, so there is no second
+    // route to hand off to — that extra hop was the "Fetching your data"
+    // screen. The intent rides on the URL because the handshake is a fresh page
+    // load with no React state.
+    const callbackUrl = `${origin}/auth/sso-callback?${params.toString()}`;
+    const redirectCallbackUrl = callbackUrl;
+    const redirectUrl = callbackUrl;
 
     try {
       // ── Why BOTH pages start a SIGN-IN ────────────────────────────────────

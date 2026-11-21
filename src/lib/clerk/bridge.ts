@@ -116,26 +116,34 @@ export async function findOrCreateSupabaseUser(
   const admin = createAdminClient();
 
   // ── Look for an existing account by email ──────────────────────────────────
-  // `listUsers` has no email filter in the admin API, so we page through. The
-  // first page is enough in practice, but we cap the walk so a huge project
-  // cannot turn this into an unbounded loop.
-  const perPage = 200;
-  for (let page = 1; page <= 10; page++) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
-    if (error) throw new Error(`Could not look up accounts: ${error.message}`);
+  // `listUsers` has no email filter, so the old code paged through the whole
+  // user table and stopped after 2,000 accounts. Past that size it silently
+  // stopped finding people — and a "not found" here means CREATE, so every
+  // user beyond the cap got a DUPLICATE account on their next sign-in, with
+  // none of their orders or chats. That is the "new accounts are not
+  // consistent" report, and it gets worse as the site grows.
+  //
+  // `public.profiles` carries the email (written by the `handle_new_user`
+  // trigger, sql/0010) and is indexed on it, so one query answers the same
+  // question for any number of users. The service-role client bypasses RLS,
+  // which is what lets it read every row.
+  const { data: existing, error: lookupError } = await admin
+    .from("profiles")
+    .select("id")
+    .ilike("email", email)
+    .limit(1)
+    .maybeSingle();
 
-    const match = data.users.find(
-      (u) => u.email?.trim().toLowerCase() === email,
-    );
-    if (match) {
-      // An existing account keeps its own role. We do NOT overwrite it: someone
-      // who is already a seller must not be demoted to buyer just because they
-      // used the buyer signup page.
-      await backfillAvatar(admin, match.id, safeAvatarUrl(identity.imageUrl));
-      return { userId: match.id, email, created: false };
-    }
+  if (lookupError) {
+    throw new Error(`Could not look up accounts: ${lookupError.message}`);
+  }
 
-    if (data.users.length < perPage) break;
+  if (existing?.id) {
+    // An existing account keeps its own role. We do NOT overwrite it: someone
+    // who is already a seller must not be demoted to buyer just because they
+    // used the buyer signup page.
+    await backfillAvatar(admin, existing.id, safeAvatarUrl(identity.imageUrl));
+    return { userId: existing.id, email, created: false };
   }
 
   // ── No account, and this flow does not allow creating one ──────────────────
@@ -163,11 +171,13 @@ export async function findOrCreateSupabaseUser(
     // A race: another request created the same email between our lookup and
     // this insert. Re-read rather than failing the sign-in.
     if (/already|exists|registered/i.test(error.message)) {
-      const { data: again } = await admin.auth.admin.listUsers({ page: 1, perPage });
-      const match = again?.users.find(
-        (u) => u.email?.trim().toLowerCase() === email,
-      );
-      if (match) return { userId: match.id, email, created: false };
+      const { data: again } = await admin
+        .from("profiles")
+        .select("id")
+        .ilike("email", email)
+        .limit(1)
+        .maybeSingle();
+      if (again?.id) return { userId: again.id, email, created: false };
     }
     throw new Error(`Could not create your account: ${error.message}`);
   }

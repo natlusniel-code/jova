@@ -79,8 +79,33 @@ export function AuthSplit({
           <Logo />
           <Badge tone="green" dot>Escrow protected</Badge>
         </div>
-        <div className="flex min-h-0 flex-1 items-start justify-center overflow-visible px-5 py-2 sm:px-8 lg:items-center lg:overflow-hidden lg:px-8 lg:py-4">
-          <div className="nm-rise w-full max-w-[420px] lg:max-h-full">{children}</div>
+        {/* ── Why `my-auto` and NOT `items-center` ────────────────────────────
+            This is the mobile signup bug, and it is subtler than it looks.
+
+            A flex container with `items-center` and content TALLER than the
+            box overflows in BOTH directions. The overflow above the top edge
+            is unreachable: a scroll container cannot scroll to a negative
+            offset. So the heading and the first provider button were clipped
+            off the top of the screen and no amount of scrolling brought them
+            back. Measured on the real component: the top of the content sat at
+            -229px with `scrollHeight === clientHeight`, i.e. the page did not
+            even know it had more to show.
+
+            `items-start` fixes the clipping but loses the centring, which
+            looks wrong on a tall desktop window.
+
+            `my-auto` on the child gives both. Auto margins absorb the free
+            space when there IS free space (so the form is centred), and
+            collapse to zero when there is not (so the content starts at the
+            top and the container scrolls normally). One rule, correct in both
+            cases, no breakpoint split.
+
+            `overflow-y-auto` only from `lg`: on a phone the DOCUMENT scrolls,
+            which is what a phone user expects (and what makes the address bar
+            collapse). A nested scroll container on mobile traps the gesture
+            and is the other half of the "can't reach the button" report. */}
+        <div className="flex min-h-0 flex-1 justify-center px-5 py-2 sm:px-8 lg:overflow-y-auto lg:px-8 lg:py-4">
+          <div className="nm-rise my-auto w-full max-w-[420px]">{children}</div>
         </div>
       </section>
     </div>

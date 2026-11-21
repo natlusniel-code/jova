@@ -1,21 +1,51 @@
 import { AuthSplit } from "@/components/auth-split";
 import { ClerkAuthPanel } from "@/components/clerk-auth-panel";
-import { getSession, createClient } from "@/lib/supabase/server";
-import { postAuthDestination } from "@/lib/post-auth";
-import { bridgeClerkSession } from "@/app/auth/clerk-actions";
-import { auth } from "@clerk/nextjs/server";
-import { CLERK_CONFIGURED } from "@/lib/clerk/config";
+import { getSession } from "@/lib/supabase/server";
+import { signedInLanding } from "@/lib/auth/landing";
+import { hasClerkSessionWithoutJova } from "@/lib/auth/resume";
+import { safeNextPath } from "@/lib/safe-next";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Create your account" };
 
+/**
+ * `/signup` — create a Jova account.
+ *
+ * `?role=seller` preselects the seller card. `?next=` is a same-origin path
+ * only, so it can never become an open redirect.
+ *
+ * ── Why the guard ───────────────────────────────────────────────────────────
+ * This page had none, and that was the "You're already signed in" dead end: a
+ * person with a live session could open /signup, fill the whole form in, and
+ * only then be told the account exists. Worse, the refusal sent them to /auth,
+ * which saw the live session and sent them back — a loop.
+ *
+ * A signed-in visitor is now sent straight to where their role belongs, before
+ * any form renders.
+ *
+ * ── Why the bridge is NOT called here ───────────────────────────────────────
+ * An earlier version called `bridgeClerkSession()` during render to resume a
+ * half-finished sign-in. That cannot work: the bridge mints a Supabase session,
+ * which WRITES cookies, and `cookies()` is read-only inside a Server Component.
+ * The call throws, the page 500s, and the person sees a broken signup page
+ * instead of a resumed session.
+ *
+ * So the resume is a redirect to `/auth/resume`, a route handler, which is
+ * allowed to write cookies. One hop, and it works.
+ */
 export default async function SignupPage({
   searchParams: searchParamsPromise,
 }: {
-  searchParams: Promise<{ role?: string; next?: string; existing?: string }>;
+  searchParams: Promise<{
+    role?: string;
+    next?: string;
+    existing?: string;
+    fresh?: string;
+  }>;
 }) {
   const searchParams = await searchParamsPromise;
+
   const initialRole =
     searchParams?.role === "seller"
       ? ("seller" as const)
@@ -23,41 +53,25 @@ export default async function SignupPage({
         ? ("buyer" as const)
         : null;
 
-  const raw = searchParams?.next ?? "";
-  const next = raw.startsWith("/") && !raw.startsWith("//") ? raw : undefined;
+  const next = safeNextPath(searchParams?.next) ?? undefined;
 
-  // If the Jova session already exists, this is a login continuation, not a
-  // second signup. Skip the auth form and go to the user's real destination.
+  // Already signed in? There is nothing to create. Send them where they
+  // belong instead of showing a form that can only fail.
   const session = await getSession();
-  if (session) {
-    const destination = await postAuthDestination(
-      createClient(),
-      session.user.id,
-      next,
-      session.profile.role,
+  if (session) redirect(next ?? signedInLanding(session));
+
+  // A live Clerk session with no Jova session: finish it rather than showing a
+  // sign-up form that Clerk will refuse to start. See src/lib/auth/resume.ts.
+  //
+  // `fresh=1` is set by /auth/resume when it found a Clerk identity with no
+  // Jova account. That is the one case where the resume check must be skipped:
+  // resuming again would send them straight back, forever. The panel clears the
+  // stale Clerk session before starting a new sign-up.
+  const fresh = searchParams?.fresh === "1";
+  if (!fresh && (await hasClerkSessionWithoutJova())) {
+    redirect(
+      next ? `/auth/resume?next=${encodeURIComponent(next)}` : "/auth/resume",
     );
-    redirect(destination);
-  }
-
-  // Clerk can remain signed in even when the Supabase bridge was interrupted.
-  // Resume that verified session instead of showing "You're already signed in"
-  // from Clerk's sign-up resource. Try login first for existing Jova users;
-  // if the profile does not exist yet, finish the signup with the selected role.
-  if (CLERK_CONFIGURED) {
-    const { userId } = await auth();
-    if (userId) {
-      const loginResult = await bridgeClerkSession({ mode: "signin", next });
-      if (loginResult.ok) redirect(loginResult.next);
-
-      if (loginResult.noAccount) {
-        const signupResult = await bridgeClerkSession({
-          mode: "signup",
-          role: initialRole ?? "buyer",
-          next,
-        });
-        if (signupResult.ok) redirect(signupResult.next);
-      }
-    }
   }
 
   return (
@@ -67,6 +81,7 @@ export default async function SignupPage({
         initialRole={initialRole}
         next={next}
         existing={searchParams?.existing === "1"}
+        clearStaleSession={fresh}
       />
     </AuthSplit>
   );
