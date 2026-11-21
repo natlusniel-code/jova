@@ -698,7 +698,7 @@ function ClerkAuthPanelInner({
 
       <div className="mt-3">
         <Link
-          href={isSignup ? "/auth/whatsapp?mode=signup" : "/auth/whatsapp?mode=login"}
+          href={isSignup ? `/auth/whatsapp?mode=signup${role ? `&role=${role}` : ""}` : "/auth/whatsapp?mode=login"}
           className="flex w-full items-center justify-center gap-2 rounded-[15px] border border-[#b9dfc8] bg-[#f0faf3] px-4 py-2.5 text-[13.5px] font-bold text-[#12643c] transition hover:bg-[#e4f5ea]"
         >
           <span aria-hidden="true">◉</span>
