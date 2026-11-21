@@ -46,7 +46,8 @@ export async function POST(request: NextRequest) {
     const admin = createAdminClient();
 
     if (action === "request") {
-      const { data: profile, error } = await admin.from("profiles").select("id, role").eq("phone", phone).maybeSingle();
+      const localPhone = "0" + phone.slice(3);
+      const { data: profile, error } = await admin.from("profiles").select("id, role").or(`phone.eq.${phone},phone.eq.+${phone},phone.eq.${localPhone}`).maybeSingle();
       if (error) throw error;
       if (purpose === "signup" && profile) return NextResponse.json({ error: "This phone number already has a Jova account. Please log in." }, { status: 409 });
       if (purpose === "login" && !profile) return NextResponse.json({ error: "No Jova account was found for this phone number. Please sign up first." }, { status: 404 });
@@ -92,7 +93,8 @@ export async function POST(request: NextRequest) {
         const { error: profileError } = await admin.from("profiles").update({ phone, phone_verified_at: new Date().toISOString(), role }).eq("id", created.data.user.id);
         if (profileError) throw profileError;
       } else {
-        const { data: profile, error } = await admin.from("profiles").select("id, role, is_banned").eq("phone", phone).maybeSingle();
+        const localPhone = "0" + phone.slice(3);
+        const { data: profile, error } = await admin.from("profiles").select("id, role, is_banned").or(`phone.eq.${phone},phone.eq.+${phone},phone.eq.${localPhone}`).maybeSingle();
         if (error) throw error;
         if (!profile || profile.id !== checked.data.user_id) return NextResponse.json({ error: "Account verification could not be completed. Request a new code." }, { status: 400 });
         if (profile.is_banned) return NextResponse.json({ error: "This account is unavailable. Contact Jova support." }, { status: 403 });
