@@ -75,7 +75,7 @@ export function AuthSplit({
   media?: React.ReactNode;
 }) {
   return (
-    <div className="grid min-h-screen bg-[var(--canvas)] lg:h-[100dvh] lg:min-h-0 lg:grid-cols-[1.02fr_1fr] lg:overflow-hidden">
+    <div className="grid h-[100dvh] min-h-0 overflow-hidden bg-[var(--canvas)] lg:grid-cols-[1.02fr_1fr]">
       {/* ── Brand panel ─────────────────────────────────────────────── */}
       <aside className="relative hidden flex-col justify-between overflow-hidden bg-[linear-gradient(150deg,#0a6b3d_0%,#075232_55%,#053f28_100%)] p-9 text-white lg:flex lg:h-[100dvh]">
         <div
@@ -142,7 +142,7 @@ export function AuthSplit({
       </aside>
 
       {/* ── Action column ───────────────────────────────────────────── */}
-      <section className="flex min-h-screen flex-col lg:h-[100dvh] lg:min-h-0">
+      <section className="flex h-[100dvh] min-h-0 flex-col overflow-hidden">
         {/* Compact header for a phone, where the brand panel is hidden. */}
         <div className="flex items-center justify-between px-5 py-4 lg:hidden">
           <Logo />
@@ -155,8 +155,8 @@ export function AuthSplit({
             form is the only thing that matters — every way in should be as
             close to the top of the screen as possible. */}
 
-        <div className="flex flex-1 items-center justify-center px-5 pb-14 pt-4 sm:px-8 lg:overflow-y-auto lg:px-8 lg:py-6">
-          <div className="nm-rise w-full max-w-[420px]">{children}</div>
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden px-5 py-2 sm:px-8 lg:px-8 lg:py-4">
+          <div className="nm-rise w-full max-w-[420px] max-h-full">{children}</div>
         </div>
       </section>
     </div>
