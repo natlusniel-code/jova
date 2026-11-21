@@ -25,12 +25,31 @@ export async function bridgeClerkSession(input: {
   const next =
     rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
 
-  const { userId: clerkUserId } = await auth();
+  // ── Why these are guarded ────────────────────────────────────────────────────
+  // `auth()` and `currentUser()` throw when the Clerk secret key is missing or
+  // Clerk is unreachable. This action is called from a client component whose
+  // only error handling is the returned `{ ok: false }` — a throw escaped it
+  // and surfaced as an unhandled rejection, leaving the button spinning with no
+  // message. A failure to read the session is a failed sign-in, which is a
+  // result this action already knows how to report.
+  let clerkUserId: string | null = null;
+  let user: Awaited<ReturnType<typeof currentUser>> = null;
+  try {
+    ({ userId: clerkUserId } = await auth());
+    if (clerkUserId) user = await currentUser();
+  } catch (e) {
+    console.error("[bridge] could not read the Clerk session:", e);
+    return {
+      ok: false,
+      error:
+        "We could not confirm your sign-in with Clerk. Please try again — if it keeps happening, the site's Clerk keys need checking.",
+    };
+  }
+
   if (!clerkUserId) {
     return { ok: false, error: "Your sign-in did not complete. Please try again." };
   }
 
-  const user = await currentUser();
   if (!user) {
     return { ok: false, error: "Your sign-in did not complete. Please try again." };
   }

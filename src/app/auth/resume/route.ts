@@ -49,7 +49,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/auth", url.origin));
   }
 
-  const { userId } = await auth();
+  // ── Why this is guarded ──────────────────────────────────────────────────────
+  // `auth()` throws when the Clerk secret key is missing or Clerk is
+  // unreachable. Unguarded, that turned this route into a 500 — and because
+  // `/auth` and `/signup` both redirect here whenever a Clerk cookie is
+  // present, a single Clerk hiccup made the whole sign-in surface return a
+  // server error instead of a login form. A failure to read the session is
+  // "no session to resume", which the login page already handles.
+  let userId: string | null = null;
+  try {
+    ({ userId } = await auth());
+  } catch (error) {
+    console.error("[auth/resume] could not read the Clerk session:", error);
+  }
 
   // No Clerk session either — nothing to resume. The login page is correct.
   if (!userId) {

@@ -53,9 +53,12 @@ export default async function AuthPage({
   // provider button fails, because Clerk will not start a second sign-in for
   // an account that is already active. Finish the session instead.
   if (await hasClerkSessionWithoutJova()) {
-    redirect(
-      next ? `/auth/resume?next=${encodeURIComponent(next)}` : "/auth/resume",
-    );
+    // A failed resume must NOT bounce again — see `resumeFailed` below.
+    if (searchParams?.resume !== "failed") {
+      redirect(
+        next ? `/auth/resume?next=${encodeURIComponent(next)}` : "/auth/resume",
+      );
+    }
   }
 
   // The video is admin-editable (sql/0047). Read on the server so the
@@ -65,9 +68,26 @@ export default async function AuthPage({
 
   const noAccount = searchParams?.noaccount === "1";
 
+  // ── Why `resume=failed` must stop the bounce ─────────────────────────────────
+  // `/auth/resume` sends a person here when it could not finish their session.
+  // Without this check the page then saw the same live Clerk session, sent
+  // them straight back to `/auth/resume`, and the two routes ping-ponged
+  // forever — a real redirect loop, not a slow one.
+  //
+  // A failed resume means the session cannot be completed automatically. The
+  // honest answer is the form, with an explanation and a way to start clean,
+  // so the person can sign in again instead of watching a spinner loop.
+  const resumeFailed = searchParams?.resume === "failed";
+
   return (
     <AuthSplit media={<SignInVideo src={media.video} poster={media.poster} compact />}>
-      <ClerkAuthPanel mode="signin" next={next} noAccount={noAccount} />
+      <ClerkAuthPanel
+        mode="signin"
+        next={next}
+        noAccount={noAccount}
+        resumeFailed={resumeFailed}
+        clearStaleSession={resumeFailed}
+      />
     </AuthSplit>
   );
 }

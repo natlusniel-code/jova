@@ -32,10 +32,36 @@ export const APP_URL =
   process.env.NEXT_PUBLIC_SITE_URL ||
   "https://naijamart-marketplace-opal.vercel.app";
 
-/** The origin to hand Clerk for an OAuth round trip. */
+/**
+ * The origin to hand Clerk for an OAuth round trip.
+ *
+ * ── Why this returns the browser's own origin ─────────────────────────────────────
+ * This used to return a hardcoded `APP_URL` for every non-localhost host, and
+ * that was the single biggest cause of "Sign-in did not complete" on a site
+ * where sign-in actually worked.
+ *
+ * The failure: the person is on `https://some-deployment.vercel.app`, but the
+ * OAuth redirect was built from the hardcoded literal. Clerk completed the
+ * handshake and set its session cookie on THAT origin — a different site from
+ * the one the person was using. The browser then returned to the origin they
+ * started on, where there was no Clerk session at all, so the bridge had
+ * nothing to bridge and the page reported a failed sign-in. Every preview
+ * deployment, every renamed project and every custom domain was broken the
+ * same way, and the error pointed at the auth code rather than at the URL.
+ *
+ * The origin the browser is actually on is the only correct answer. Clerk
+ * validates it against the instance's allowed origins, so a host that is not
+ * allowed fails loudly with "redirect URL not allowed" — which names the real
+ * problem and is fixed in the Clerk dashboard, not in this file.
+ */
 export function oauthOrigin(here: string): string {
-  if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(here)) {
-    return here;
+  try {
+    const url = new URL(here);
+    if (url.protocol === "https:" || url.protocol === "http:") {
+      return url.origin;
+    }
+  } catch {
+    // Not a URL — fall through to the configured value below.
   }
   return APP_URL;
 }

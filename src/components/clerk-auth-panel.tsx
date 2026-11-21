@@ -56,6 +56,7 @@ export function ClerkAuthPanel(props: {
   noAccount?: boolean;
   existing?: boolean;
   clearStaleSession?: boolean;
+  resumeFailed?: boolean;
 }) {
   if (!CLERK_CONFIGURED) return <ClerkNotConfigured />;
   return <ClerkAuthPanelInner {...props} />;
@@ -96,6 +97,7 @@ function ClerkAuthPanelInner({
   noAccount = false,
   existing = false,
   clearStaleSession = false,
+  resumeFailed = false,
 }: {
   mode: Mode;
   next?: string;
@@ -103,6 +105,7 @@ function ClerkAuthPanelInner({
   noAccount?: boolean;
   existing?: boolean;
   clearStaleSession?: boolean;
+  resumeFailed?: boolean;
 }) {
   const router = useRouter();
   // Clerk 7's hooks return a signal: `{ signIn, errors, fetchStatus }`. There is
@@ -126,13 +129,23 @@ function ClerkAuthPanelInner({
    * cookie; the Supabase cookie is already absent (that is why we are here).
    */
   const cleared = useRef(false);
+  // True while a stale Clerk session is being cleared.
+  //
+  // `signOut()` is asynchronous, and the form used to be usable the instant it
+  // rendered. A provider button pressed before the sign-out resolved was
+  // refused by Clerk with "You're already signed in" — the exact dead end this
+  // page exists to remove, and the one in the bug report. So the form stays
+  // disabled until the cleanup has actually finished.
+  const [clearing, setClearing] = useState(clearStaleSession);
   useEffect(() => {
     if (!clearStaleSession || cleared.current) return;
     cleared.current = true;
-    void signOut().catch(() => {
-      // A failure here is not fatal: the sign-up attempt below will report the
-      // real problem if the session is still active.
-    });
+    signOut()
+      .catch(() => {
+        // A failure here is not fatal: the sign-up attempt below will report
+        // the real problem if the session is still active.
+      })
+      .finally(() => setClearing(false));
   }, [clearStaleSession, signOut]);
 
   const [role, setRole] = useState<Role | null>(initialRole);
@@ -156,12 +169,18 @@ function ClerkAuthPanelInner({
   const [error, setError] = useState("");
 
   const isSignup = mode === "signup";
-  const ready = signInStatus === "idle" && signUpStatus === "idle";
+  const ready = signInStatus === "idle" && signUpStatus === "idle" && !clearing;
 
   /** Turn a Clerk error into one readable sentence. */
   const readError = useCallback((e: unknown, fallback: string) => {
     if (isClerkAPIResponseError(e)) {
       const first = e.errors?.[0];
+      // Clerk's own rate limiter. Its raw text ("Too many requests") reads like
+      // a bug in the site, so say what actually happened and what to do about
+      // it. This is what the person saw after a run of failed attempts.
+      if (first?.code === "rate_limit_exceeded") {
+        return "Too many attempts in a short time. Wait a minute, then try again — or use a different sign-in method.";
+      }
       return first?.longMessage || first?.message || fallback;
     }
     return e instanceof Error ? e.message : fallback;
@@ -190,11 +209,26 @@ function ClerkAuthPanelInner({
    */
   const finish = useCallback(
     async (opts: { mode: Mode; role?: Role | null }) => {
-      const result = await bridgeClerkSession({
-        mode: opts.mode,
-        role: opts.role ?? "buyer",
-        next: next ?? null,
-      });
+      // A Server Action can still reject (a network drop, a cold start, a
+      // thrown error inside the bridge). Without this the button spun forever
+      // with no message — the "stuck" report. Any failure becomes a visible
+      // error on the form the person is looking at.
+      let result: Awaited<ReturnType<typeof bridgeClerkSession>>;
+      try {
+        result = await bridgeClerkSession({
+          mode: opts.mode,
+          role: opts.role ?? "buyer",
+          next: next ?? null,
+        });
+      } catch (e) {
+        setBusy(null);
+        setError(
+          e instanceof Error
+            ? e.message
+            : "We could not finish your sign-in. Please try again.",
+        );
+        return;
+      }
 
       if (!result.ok) {
         // A refusal belongs on the page the person was using, under the button
@@ -604,6 +638,18 @@ function ClerkAuthPanelInner({
           <Link href="/auth" className="nm-btn-primary mt-3.5 w-full">
             Log in
           </Link>
+        </div>
+      )}
+
+      {resumeFailed && (
+        <div className="mb-4 rounded-[16px] border border-[#f2d9a8] bg-[#fdf7ec] px-4 py-3">
+          <p className="text-[13.5px] font-bold text-[#7a4f08]">
+            We could not finish your last sign-in
+          </p>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-[#8a5a0b]">
+            Your previous session could not be completed. Sign in again below —
+            it will start clean.
+          </p>
         </div>
       )}
 
