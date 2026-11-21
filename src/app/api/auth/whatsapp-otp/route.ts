@@ -3,8 +3,6 @@ import { createHmac, randomInt } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { mintSession } from "@/lib/auth/local";
 import { postAuthDestination } from "@/lib/post-auth";
-import { createClient } from "@supabase/supabase-js";
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -106,9 +104,7 @@ export async function POST(request: NextRequest) {
       }
 
       await mintSession(email);
-      const sessionClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-      const { data: { user } } = await admin.auth.admin.getUserByEmail(email);
-      const destination = user ? await postAuthDestination(sessionClient as never, user.id, null, role).catch(() => role === "seller" ? "/seller/onboarding?step=1" : "/") : "/";
+      const destination = await postAuthDestination(admin, userId, null, role).catch(() => role === "seller" ? "/seller/onboarding?step=1" : "/");
       return NextResponse.json({ ok: true, next: destination });
     }
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
