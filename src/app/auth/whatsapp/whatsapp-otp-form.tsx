@@ -1,15 +1,14 @@
 "use client";
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Spinner, Alert } from "@/components/ui";
 
-export function WhatsAppOtpForm({ mode }: { mode: "signup" | "login" }) {
+export function WhatsAppOtpForm({ mode, initialRole = "buyer" }: { mode: "signup" | "login"; initialRole?: "buyer" | "seller" }) {
   const router = useRouter();
-  const params = useSearchParams();
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
-  const [role, setRole] = useState<"buyer" | "seller">(params.get("role") === "seller" ? "seller" : "buyer");
+  const [role, setRole] = useState<"buyer" | "seller">(initialRole);
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
