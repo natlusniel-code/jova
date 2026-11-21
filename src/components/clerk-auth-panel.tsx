@@ -535,11 +535,11 @@ function ClerkAuthPanelInner({
   return (
     <div>
       {/* ── Heading ─────────────────────────────────────────────────────── */}
-      <div className="mb-6">
-        <h1 className="font-display text-[27px] font-extrabold tracking-[-0.035em] text-ink-900">
+      <div className="mb-4">
+        <h1 className="font-display text-[24px] font-extrabold leading-tight tracking-[-0.035em] text-ink-900">
           {isSignup ? "Create your account" : "Welcome back"}
         </h1>
-        <p className="mt-2 text-[13.5px] leading-relaxed text-ink-500">
+        <p className="mt-1 text-[13px] leading-snug text-ink-500">
           {isSignup
             ? "Tell us what you're here for, then pick how you'd like to sign in."
             : "Sign in to get back to your profile, orders and chats."}
@@ -548,7 +548,7 @@ function ClerkAuthPanelInner({
 
       {/* ── Refusals from the server ────────────────────────────────────── */}
       {noAccount && (
-        <div className="mb-5 rounded-[16px] border border-[#f2d9a8] bg-[#fdf7ec] px-4 py-4">
+        <div className="mb-4 rounded-[16px] border border-[#f2d9a8] bg-[#fdf7ec] px-4 py-3">
           <p className="text-[13.5px] font-bold text-[#7a4f08]">
             You don&apos;t have an account yet
           </p>
@@ -563,7 +563,7 @@ function ClerkAuthPanelInner({
       )}
 
       {existing && (
-        <div className="mb-5 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-4">
+        <div className="mb-4 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3">
           <p className="text-[13.5px] font-bold text-amber-900">
             You already have an account
           </p>
@@ -578,7 +578,7 @@ function ClerkAuthPanelInner({
       )}
 
       {error && (
-        <div className="mb-5">
+        <div className="mb-4">
           <Alert tone="red" title="Sign-in did not complete">
             {error}
           </Alert>
@@ -588,10 +588,10 @@ function ClerkAuthPanelInner({
       {/* ── Role choice (sign-up only) ──────────────────────────────────── */}
       {isSignup && (
         <>
-          <p className="text-[12px] font-bold uppercase tracking-wider text-ink-500">
+          <p className="text-[11.5px] font-bold uppercase tracking-wider text-ink-500">
             What brings you here?
           </p>
-          <div className="mt-2 grid gap-2.5 sm:grid-cols-2">
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {(
               [
                 {
@@ -616,7 +616,7 @@ function ClerkAuthPanelInner({
                   onClick={() => setRole(c.key)}
                   aria-pressed={active}
                   className={cn(
-                    "relative rounded-2xl border-2 p-3.5 text-left transition",
+                    "relative rounded-2xl border-2 p-3 text-left transition",
                     active
                       ? "border-brand-500 bg-brand-50/70 shadow-card"
                       : "border-[var(--line)] bg-white hover:border-brand-300 hover:bg-brand-50/30",
@@ -624,17 +624,17 @@ function ClerkAuthPanelInner({
                 >
                   <span
                     className={cn(
-                      "grid h-8 w-8 place-items-center rounded-xl text-[17px] leading-none",
+                      "grid h-7 w-7 place-items-center rounded-lg text-[15px] leading-none",
                       active ? "bg-brand-500" : "bg-slate-100",
                     )}
                     aria-hidden="true"
                   >
                     {c.emoji}
                   </span>
-                  <p className="mt-2 text-[13.5px] font-bold leading-snug text-ink-900">
+                  <p className="mt-1.5 text-[13px] font-bold leading-snug text-ink-900">
                     {c.title}
                   </p>
-                  <p className="mt-0.5 text-[12px] leading-relaxed text-ink-500">
+                  <p className="mt-0.5 text-[11.5px] leading-snug text-ink-500">
                     {c.body}
                   </p>
                   <span
@@ -666,7 +666,7 @@ function ClerkAuthPanelInner({
       )}
 
       {/* ── Providers ───────────────────────────────────────────────────── */}
-      <div className={cn("space-y-2.5", isSignup ? "mt-5" : "mt-0")}>
+      <div className={cn("space-y-2", isSignup ? "mt-4" : "mt-0")}>
         {OAUTH_PROVIDERS.map((p) => (
           <button
             key={p.key}
@@ -675,7 +675,7 @@ function ClerkAuthPanelInner({
             disabled={!ready || !roleChosen || busy !== null}
             aria-busy={busy === p.label}
             className={cn(
-              "flex w-full items-center justify-center gap-2.5 rounded-[15px] border border-[var(--line)] bg-white px-4 py-3 text-[14.5px] font-semibold text-ink-900 transition",
+              "flex w-full items-center justify-center gap-2.5 rounded-[15px] border border-[var(--line)] bg-white px-4 py-2.5 text-[14px] font-semibold text-ink-900 transition",
               "hover:border-brand-300 hover:bg-brand-50/40 disabled:cursor-not-allowed disabled:opacity-50",
             )}
           >
@@ -697,7 +697,7 @@ function ClerkAuthPanelInner({
       )}
 
       {/* ── Divider ─────────────────────────────────────────────────────── */}
-      <div className="my-6 flex items-center gap-3">
+      <div className="my-4 flex items-center gap-3">
         <span className="h-px flex-1 bg-[var(--line)]" />
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400">
           or use email
@@ -707,7 +707,7 @@ function ClerkAuthPanelInner({
 
       {/* ── Email: password or one-time code ────────────────────────────── */}
       {step === "email" ? (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {/* The two ways to prove the address. A returning user with a
               password picks the first; an Appwrite/Google user with no
               password picks the second. */}
@@ -752,10 +752,10 @@ function ClerkAuthPanelInner({
                   : handlePasswordSignIn
                 : handleSendCode
             }
-            className="space-y-3"
+            className="space-y-2.5"
           >
             <label className="block">
-              <span className="mb-1.5 block text-[12.5px] font-semibold text-ink-700">
+              <span className="mb-1 block text-[12px] font-semibold text-ink-700">
                 Email address
               </span>
               <input
@@ -766,13 +766,13 @@ function ClerkAuthPanelInner({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 disabled={busy !== null}
-                className="w-full rounded-[13px] border border-[var(--line)] bg-white px-3.5 py-3 text-[14.5px] text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:opacity-60"
+                className="w-full rounded-[13px] border border-[var(--line)] bg-white px-3.5 py-2.5 text-[14px] text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:opacity-60"
               />
             </label>
 
             {method === "password" && (
               <label className="block">
-                <span className="mb-1.5 block text-[12.5px] font-semibold text-ink-700">
+                <span className="mb-1 block text-[12px] font-semibold text-ink-700">
                   Password
                 </span>
                 <input
@@ -782,7 +782,7 @@ function ClerkAuthPanelInner({
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={isSignup ? "At least 8 characters" : "Your password"}
                   disabled={busy !== null}
-                  className="w-full rounded-[13px] border border-[var(--line)] bg-white px-3.5 py-3 text-[14.5px] text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:opacity-60"
+                  className="w-full rounded-[13px] border border-[var(--line)] bg-white px-3.5 py-2.5 text-[14px] text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:opacity-60"
                 />
               </label>
             )}
@@ -791,7 +791,7 @@ function ClerkAuthPanelInner({
               type="submit"
               disabled={!ready || !roleChosen || busy !== null}
               aria-busy={busy === "password" || busy === "email"}
-              className="nm-btn-primary w-full py-3 text-[15px] disabled:cursor-not-allowed disabled:opacity-50"
+              className="nm-btn-primary w-full py-2.5 text-[14.5px] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy === "password" || busy === "email" ? <Spinner /> : null}
               {method === "password"
@@ -807,7 +807,7 @@ function ClerkAuthPanelInner({
                   : "Email me a sign-in code"}
             </button>
 
-            <p className="text-center text-[11.5px] leading-relaxed text-ink-400">
+            <p className="text-center text-[11px] leading-snug text-ink-400">
               {method === "password"
                 ? isSignup
                   ? "We'll email a code to confirm the address before your account is active."
@@ -865,7 +865,7 @@ function ClerkAuthPanelInner({
       )}
 
       {/* ── Door between the two pages ──────────────────────────────────── */}
-      <p className="mt-6 text-center text-[13px] text-ink-500">
+      <p className="mt-4 text-center text-[13px] text-ink-500">
         {isSignup ? (
           <>
             Already have an account?{" "}
@@ -883,7 +883,7 @@ function ClerkAuthPanelInner({
         )}
       </p>
 
-      <p className="mt-6 text-center text-[11.5px] leading-relaxed text-ink-400">
+      <p className="mt-3 text-center text-[11px] leading-snug text-ink-400">
         By continuing you agree to our{" "}
         <Link href="/legal/terms" className="underline underline-offset-2 hover:text-ink-700">
           Terms

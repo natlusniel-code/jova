@@ -23,6 +23,7 @@ import { useEffect, useRef, useState } from "react";
 export function SignInVideo({
   src = "/media/signin.mp4",
   poster = "/media/signin-poster.jpg",
+  compact = false,
 }: {
   /**
    * Both default to the bundled files, so the component works with no
@@ -33,6 +34,12 @@ export function SignInVideo({
    */
   src?: string;
   poster?: string;
+  /**
+   * Shorter frame for the brand panel, where the video is a mood-setting
+   * strip above the trust bullets rather than the main event. The form
+   * column needs the vertical room more than the video does.
+   */
+  compact?: boolean;
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const [ready, setReady] = useState(false);
@@ -67,7 +74,9 @@ export function SignInVideo({
     <div className="relative overflow-hidden rounded-2xl bg-ink-900 shadow-lift">
       <video
         ref={ref}
-        className={`h-40 w-full object-cover transition-opacity duration-500 sm:h-48 ${ready ? "opacity-100" : "opacity-0"}`}
+        className={`w-full object-cover transition-opacity duration-500 ${
+          compact ? "h-[132px]" : "h-40 sm:h-48"
+        } ${ready ? "opacity-100" : "opacity-0"}`}
         src={src}
         poster={poster}
         autoPlay

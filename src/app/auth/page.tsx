@@ -13,8 +13,10 @@ export const metadata = { title: "Log in" };
  *
  * ── Layout ──────────────────────────────────────────────────────────────────
  * Video first, unchanged: same component, same file, same poster, same silent
- * autoplay behaviour. Directly underneath it sits the auth panel, which now
- * offers four ways in — Google, Apple, LinkedIn and an emailed one-time code.
+ * autoplay behaviour. It now sits in the brand panel rather than above the
+ * form, so the whole set of sign-in options fits one screen without scrolling.
+ * The auth panel offers four ways in — Google, Apple, LinkedIn and email
+ * (password or an emailed one-time code).
  * Below that, the "Create an account" link: login and sign-up are two separate
  * pages, and this is the door between them.
  *
@@ -59,8 +61,7 @@ export default async function AuthPage({
   // path here, so nothing to report. `existing` only means something on
   // /signup, and /auth never renders it.
   return (
-    <AuthSplit>
-      <SignInVideo src={media.video} poster={media.poster} />
+    <AuthSplit media={<SignInVideo src={media.video} poster={media.poster} compact />}>
       <ClerkAuthPanel
         mode="signin"
         next={next}

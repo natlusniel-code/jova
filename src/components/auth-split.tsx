@@ -45,19 +45,39 @@ const BULLETS = [
  *
  * ── Right: the action column ──────────────────────────────────────────
  * A warm off-white canvas (not white, not black) with the form centred in
- * a 430px column. On a phone the brand panel collapses to a compact
+ * a 420px column. On a phone the brand panel collapses to a compact
  * header and the action column takes the whole screen.
  *
- * ── Spacing ───────────────────────────────────────────────────────────
- * The panel is padded at 44px and the bullets are 22px apart. Nothing is
- * flush: the logo, the headline, the list and the legal line each sit in
- * their own band with real air between them.
+ * ── Why the desktop column is exactly one viewport tall ───────────────
+ * Every way in — three providers, the email/password form, the code
+ * fallback, the link to the other page — has to be visible at once. A
+ * login screen that hides its last button below the fold makes people
+ * think the page is broken. So on `lg` and up the shell is pinned to
+ * `100dvh` and the action column is a fixed-height flex box: the form is
+ * centred inside it and never pushes the page taller than the window.
+ *
+ * The video used to sit above the form, which is what pushed the email
+ * fields off a laptop screen. It now lives in the brand panel, where it
+ * has room and costs the form nothing. On a phone, where the brand panel
+ * is hidden, a short version of the same video still opens the page.
+ *
+ * `overflow-y-auto` on the action column is a safety valve, not the
+ * normal path: at a normal laptop height nothing overflows, but on a very
+ * short window (or with a long server error showing) the column scrolls
+ * inside itself instead of clipping the submit button.
  */
-export function AuthSplit({ children }: { children: React.ReactNode }) {
+export function AuthSplit({
+  children,
+  media,
+}: {
+  children: React.ReactNode;
+  /** Optional brand media (the sign-in video) for the left panel. */
+  media?: React.ReactNode;
+}) {
   return (
-    <div className="grid min-h-screen bg-[var(--canvas)] lg:grid-cols-[1.02fr_1fr]">
+    <div className="grid min-h-screen bg-[var(--canvas)] lg:h-[100dvh] lg:min-h-0 lg:grid-cols-[1.02fr_1fr] lg:overflow-hidden">
       {/* ── Brand panel ─────────────────────────────────────────────── */}
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-[linear-gradient(150deg,#0a6b3d_0%,#075232_55%,#053f28_100%)] p-11 text-white lg:flex">
+      <aside className="relative hidden flex-col justify-between overflow-hidden bg-[linear-gradient(150deg,#0a6b3d_0%,#075232_55%,#053f28_100%)] p-9 text-white lg:flex lg:h-[100dvh]">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
@@ -87,19 +107,21 @@ export function AuthSplit({ children }: { children: React.ReactNode }) {
             Nigeria&apos;s escrow marketplace
           </span>
 
-          <h1 className="mt-5 font-display text-[33px] font-extrabold leading-[1.1] tracking-[-0.04em] text-white">
+          <h1 className="mt-4 font-display text-[28px] font-extrabold leading-[1.12] tracking-[-0.04em] text-white">
             Buy and hire from verified sellers in your state.
           </h1>
 
-          <ul className="mt-9 space-y-6">
+          {media ? <div className="mt-5">{media}</div> : null}
+
+          <ul className="mt-6 space-y-4">
             {BULLETS.map((b) => (
-              <li key={b.title} className="flex gap-3.5">
-                <span className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-[13px] border border-white/15 bg-white/10 text-lime">
+              <li key={b.title} className="flex gap-3">
+                <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[12px] border border-white/15 bg-white/10 text-lime">
                   {b.icon}
                 </span>
                 <div>
-                  <p className="text-[14px] font-bold leading-snug text-white">{b.title}</p>
-                  <p className="mt-1 text-[12.5px] leading-relaxed text-[#bcd9c8]">{b.body}</p>
+                  <p className="text-[13.5px] font-bold leading-snug text-white">{b.title}</p>
+                  <p className="mt-0.5 text-[12px] leading-relaxed text-[#bcd9c8]">{b.body}</p>
                 </div>
               </li>
             ))}
@@ -120,7 +142,7 @@ export function AuthSplit({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* ── Action column ───────────────────────────────────────────── */}
-      <section className="flex min-h-screen flex-col">
+      <section className="flex min-h-screen flex-col lg:h-[100dvh] lg:min-h-0">
         {/* Compact header for a phone, where the brand panel is hidden. */}
         <div className="flex items-center justify-between px-5 py-4 lg:hidden">
           <Logo />
@@ -129,8 +151,12 @@ export function AuthSplit({ children }: { children: React.ReactNode }) {
           </Badge>
         </div>
 
-        <div className="flex flex-1 items-center justify-center px-5 pb-14 pt-4 sm:px-8">
-          <div className="nm-rise w-full max-w-[430px]">{children}</div>
+        {/* No video on a phone: the brand panel is hidden there, and the
+            form is the only thing that matters — every way in should be as
+            close to the top of the screen as possible. */}
+
+        <div className="flex flex-1 items-center justify-center px-5 pb-14 pt-4 sm:px-8 lg:overflow-y-auto lg:px-8 lg:py-6">
+          <div className="nm-rise w-full max-w-[420px]">{children}</div>
         </div>
       </section>
     </div>
