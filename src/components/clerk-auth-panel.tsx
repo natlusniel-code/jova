@@ -173,6 +173,25 @@ function ClerkAuthPanelInner({
 
   /** Turn a Clerk error into one readable sentence. */
   const readError = useCallback((e: unknown, fallback: string) => {
+    // ── Never show Clerk's internal diagnostics ──────────────────────────────
+    // Bot-protection failures arrive as messages written for a developer, e.g.
+    // `Clerk: Protect check script execution failed: turnstile widget error
+    // (code="protect_check_execution_failed")`. That is not something a shopper
+    // can act on, and it reads like the site is broken. The cause is almost
+    // always a browser extension, a strict privacy setting or a network that
+    // blocks the challenge script, so say that instead.
+    //
+    // This is checked on the RAW message before anything else, because the
+    // failure arrives as a plain `Error` (not a ClerkAPIResponseError) and so
+    // never reached the branch below.
+    const raw = e instanceof Error ? e.message : "";
+    if (/turnstile|protect check|protect_check/i.test(raw)) {
+      return "We could not verify this browser. Turn off any ad or privacy blocker for this site, then try again — or use a different sign-in method.";
+    }
+    if (/^Clerk:/i.test(raw)) {
+      return fallback;
+    }
+
     if (isClerkAPIResponseError(e)) {
       const first = e.errors?.[0];
       // Clerk's own rate limiter. Its raw text ("Too many requests") reads like
@@ -181,9 +200,16 @@ function ClerkAuthPanelInner({
       if (first?.code === "rate_limit_exceeded") {
         return "Too many attempts in a short time. Wait a minute, then try again — or use a different sign-in method.";
       }
+      if (first?.code?.startsWith("protect_") || /turnstile|protect check/i.test(first?.message ?? "")) {
+        return "We could not verify this browser. Turn off any ad or privacy blocker for this site, then try again — or use a different sign-in method.";
+      }
+      // Any other message that is really a developer diagnostic.
+      if (/^Clerk:/i.test(first?.message ?? "")) {
+        return fallback;
+      }
       return first?.longMessage || first?.message || fallback;
     }
-    return e instanceof Error ? e.message : fallback;
+    return raw || fallback;
   }, []);
 
   /**
