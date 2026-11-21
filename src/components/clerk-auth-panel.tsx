@@ -974,6 +974,9 @@ function ClerkAuthPanelInner({
               </label>
             )}
 
+            {/* Clerk renders its Turnstile challenge here for custom sign-up flows. */}
+            <div id="clerk-captcha" />
+
             <button
               type="submit"
               disabled={!ready || !roleChosen || busy !== null}
