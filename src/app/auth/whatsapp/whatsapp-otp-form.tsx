@@ -15,6 +15,21 @@ export function WhatsAppOtpForm({ mode }: { mode: "signup" | "login" }) {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
+  async function resend() {
+    setBusy(true); setError(""); setInfo("");
+    try {
+      const response = await fetch("/api/auth/whatsapp-otp", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "request", purpose: mode, phone, role }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not resend the code.");
+      setInfo("A new code has been sent to your WhatsApp. The previous code is no longer valid.");
+      setCode("");
+    } catch (e) { setError(e instanceof Error ? e.message : "Please try again."); }
+    finally { setBusy(false); }
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true); setError(""); setInfo("");
@@ -47,7 +62,7 @@ export function WhatsAppOtpForm({ mode }: { mode: "signup" | "login" }) {
       : <label className="block"><span className="mb-1.5 block text-[12px] font-semibold text-ink-700">6-digit verification code</span><input autoFocus type="text" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0,6))} placeholder="000000" required maxLength={6} className="w-full rounded-[13px] border border-[var(--line)] bg-white px-3.5 py-3 text-center text-[22px] font-bold tracking-[0.35em] text-ink-900 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"/></label>}
       <button type="submit" disabled={busy || (step === "code" && code.length !== 6)} className="nm-btn-primary flex w-full items-center justify-center gap-2 py-3 text-[14px] disabled:opacity-50">{busy && <Spinner/>}{busy ? "Please wait…" : step === "phone" ? "Send WhatsApp code" : "Verify and continue"}</button>
     </form>
-    {step === "code" && <div className="mt-4 flex items-center justify-between text-[12px]"><button type="button" onClick={() => {setStep("phone");setCode("");setInfo("");setError("");}} className="font-semibold text-brand-600 hover:underline">Change number</button><button type="button" disabled={busy} onClick={() => {setStep("phone");setCode("");setInfo("");setError("");}} className="font-semibold text-brand-600 hover:underline disabled:opacity-50">Resend code</button></div>}
+    {step === "code" && <div className="mt-4 flex items-center justify-between text-[12px]"><button type="button" onClick={() => {setStep("phone");setCode("");setInfo("");setError("");}} className="font-semibold text-brand-600 hover:underline">Change number</button><button type="button" disabled={busy} onClick={resend} className="font-semibold text-brand-600 hover:underline disabled:opacity-50">Resend code</button></div>}
     <p className="mt-5 text-center text-[12px] text-ink-500">{mode === "signup" ? <>Already have an account? <Link href="/auth/whatsapp?mode=login" className="font-bold text-brand-600">Log in</Link></> : <>New to Jova? <Link href="/auth/whatsapp?mode=signup" className="font-bold text-brand-600">Create an account</Link></>}</p>
   </div>;
 }
