@@ -467,7 +467,7 @@ function ClerkAuthPanelInner({
       if (signIn.status === "complete") {
         // `finalize()` is what actually sets the active session in Clerk 7 —
         // the old `setActive({ session: createdSessionId })` is gone.
-        await signIn.finalize();
+        await signIn.finalize({ navigate: async () => {} });
         await finish({ mode, role });
         return;
       }
@@ -674,7 +674,7 @@ function ClerkAuthPanelInner({
           setError("That code did not work. Check it and try again.");
           return;
         }
-        await withDeadline(signUp.finalize());
+        await withDeadline(signUp.finalize({ navigate: async () => {} }));
       } else {
         const { error: verifyError } = await withDeadline(
           signIn.emailCode.verifyCode({ code: value }),
@@ -685,7 +685,7 @@ function ClerkAuthPanelInner({
           setError("That code did not work. Check it and try again.");
           return;
         }
-        await withDeadline(signIn.finalize());
+        await withDeadline(signIn.finalize({ navigate: async () => {} }));
       }
 
       await finish({ mode, role });
