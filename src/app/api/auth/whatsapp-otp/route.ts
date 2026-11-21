@@ -32,7 +32,14 @@ async function sendWhatsApp(phone: string, message: string) {
     signal: AbortSignal.timeout(15000),
   });
   const payload = await response.json().catch(() => null);
-  if (!response.ok || payload?.status !== "success" || payload?.data?.status !== "success") throw new Error("WhatsApp could not send the verification code.");
+  const actionStatus = payload?.data?.status;
+  const hasSentMessage = Boolean(payload?.data?._data || payload?.data?.id);
+  const actionFailed = actionStatus === "error" || (actionStatus !== "success" && !hasSentMessage);
+  if (!response.ok || payload?.status !== "success" || actionFailed) {
+    const detail = payload?.data?.message || payload?.data?.explanation || payload?.message;
+    console.error("[whatsapp-otp] WAAPI send failed", { httpStatus: response.status, actionStatus, detail });
+    throw new Error(detail ? `WhatsApp delivery failed: ${detail}` : `WhatsApp delivery failed (HTTP ${response.status}).`);
+  }
 }
 
 export async function POST(request: NextRequest) {
