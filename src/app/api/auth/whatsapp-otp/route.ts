@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
       }
 
       let email = syntheticEmail(phone);
+      let userId = String(checked.data.user_id);
       let role = "buyer";
       if (checked.data.purpose === "signup") {
         const chosenRole = body?.role === "seller" ? "seller" : "buyer";
@@ -89,8 +90,9 @@ export async function POST(request: NextRequest) {
           if (/already|exists|registered/i.test(created.error.message)) return NextResponse.json({ error: "This phone number already has an account. Please log in." }, { status: 409 });
           throw created.error;
         }
+        userId = created.data.user.id;
         role = chosenRole;
-        const { error: profileError } = await admin.from("profiles").update({ phone, phone_verified_at: new Date().toISOString(), role }).eq("id", created.data.user.id);
+        const { error: profileError } = await admin.from("profiles").update({ phone, phone_verified_at: new Date().toISOString(), role }).eq("id", userId);
         if (profileError) throw profileError;
       } else {
         const localPhone = "0" + phone.slice(3);
@@ -98,6 +100,7 @@ export async function POST(request: NextRequest) {
         if (error) throw error;
         if (!profile || profile.id !== checked.data.user_id) return NextResponse.json({ error: "Account verification could not be completed. Request a new code." }, { status: 400 });
         if (profile.is_banned) return NextResponse.json({ error: "This account is unavailable. Contact Jova support." }, { status: 403 });
+        userId = profile.id;
         role = profile.role ?? "buyer";
         const { data: authUser, error: userError } = await admin.auth.admin.getUserById(profile.id);
         if (userError || !authUser.user?.email) throw new Error("Could not load the account session.");
