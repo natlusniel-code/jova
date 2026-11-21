@@ -3,7 +3,7 @@
 create table if not exists public.whatsapp_otp_challenges (
   phone text primary key,
   purpose text not null check (purpose in ('signup', 'login')),
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id uuid,
   code_hash text not null,
   attempts integer not null default 0,
   expires_at timestamptz not null,
