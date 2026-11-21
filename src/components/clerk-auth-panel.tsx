@@ -454,6 +454,49 @@ function ClerkAuthPanelInner({
       );
 
       if (pwError) {
+        const code = errorCode(pwError);
+
+        // Existing Jova accounts may predate Clerk or may have been created
+        // through Google. They do not necessarily have a Clerk password.
+        // Move those users to the enabled email-code flow instead of trapping
+        // them on a password error.
+        if (code === "form_identifier_not_found" || code === "strategy_for_user_invalid") {
+          const { error: createError } = await withDeadline(
+            signIn.create({ identifier: address }),
+          );
+
+          let startedAsSignUp = false;
+          if (createError) {
+            const missing = errorCode(createError);
+            if (!/identifier_not_found|form_identifier/i.test(missing)) {
+              throw createError;
+            }
+
+            const { error: signupError } = await withDeadline(
+              signUp.create({ emailAddress: address }),
+            );
+            if (signupError) throw signupError;
+
+            const { error: sendError } = await withDeadline(
+              signUp.verifications.sendEmailCode(),
+            );
+            if (sendError) throw sendError;
+            startedAsSignUp = true;
+          } else {
+            const { error: sendError } = await withDeadline(
+              signIn.emailCode.sendCode(),
+            );
+            if (sendError) throw sendError;
+          }
+
+          setCodeFlow(startedAsSignUp ? "signup" : "signin");
+          setCode("");
+          setStep("code");
+          setBusy(null);
+          setError("We sent an email code so you can securely access this Jova account.");
+          return;
+        }
+
         setBusy(null);
         setError(
           readError(
@@ -904,10 +947,12 @@ function ClerkAuthPanelInner({
             className="grid grid-cols-2 gap-1 rounded-[13px] border border-[var(--line)] bg-slate-50/70 p-1"
           >
             {(
-              [
-                { key: "password" as const, label: "Password" },
-                { key: "code" as const, label: "Email code" },
-              ] as const
+              (isSignup
+                ? [{ key: "password" as const, label: "Password" }]
+                : [
+                    { key: "password" as const, label: "Password" },
+                    { key: "code" as const, label: "Email code" },
+                  ])
             ).map((m) => (
               <button
                 key={m.key}
