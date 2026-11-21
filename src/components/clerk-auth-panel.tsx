@@ -228,6 +228,45 @@ function ClerkAuthPanelInner({
   }, []);
 
   /**
+   * Run a Clerk call with a deadline.
+   *
+   * ── Why this exists ──────────────────────────────────────────────────────────
+   * A Clerk request that never settles leaves the button on "Creating your
+   * account…" forever: the promise neither resolves nor rejects, so no `catch`
+   * runs and no error is ever shown. That is the "stuck" report, and it is the
+   * worst possible failure because the person cannot tell whether their account
+   * was made.
+   *
+   * A hung request is indistinguishable from a slow one, so the only honest
+   * move is to give up after a bounded wait and say so. The account may in fact
+   * have been created — the message says that, and points at the way to check.
+   */
+  const withDeadline = useCallback(
+    async <T,>(work: Promise<T>, ms = 20000): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([
+          work,
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    "This is taking longer than expected. Check your connection and try again — if your account was created, use “Log in”.",
+                  ),
+                ),
+              ms,
+            );
+          }),
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    },
+    [],
+  );
+
+  /**
    * Finish: mint the Supabase session and navigate.
    *
    * Called after Clerk reports a complete session, from both the OAuth return
@@ -389,10 +428,12 @@ function ClerkAuthPanelInner({
       // the message below points them at the code option, which is the way in
       // for them. Creating an account here would be wrong: the login page must
       // not be able to create one.
-      const { error: pwError } = await signIn.password({
-        identifier: address,
-        password,
-      });
+      const { error: pwError } = await withDeadline(
+        signIn.password({
+          identifier: address,
+          password,
+        }),
+      );
 
       if (pwError) {
         setBusy(null);
@@ -455,16 +496,20 @@ function ClerkAuthPanelInner({
     setBusy("password");
 
     try {
-      const { error: createError } = await signUp.create({
-        emailAddress: address,
-        password,
-      });
+      const { error: createError } = await withDeadline(
+        signUp.create({
+          emailAddress: address,
+          password,
+        }),
+      );
       if (createError) throw createError;
 
       // Clerk emails a verification code for the new address. The account is
       // not usable until it is verified, so the code step is mandatory here —
       // it is not an optional second factor.
-      const { error: sendError } = await signUp.verifications.sendEmailCode();
+      const { error: sendError } = await withDeadline(
+        signUp.verifications.sendEmailCode(),
+      );
       if (sendError) throw sendError;
 
       setCodeFlow("signup");
@@ -522,17 +567,19 @@ function ClerkAuthPanelInner({
       let startedAsSignUp = false;
 
       if (isSignup) {
-        const { error: createError } = await signUp.create({
-          emailAddress: address,
-        });
+        const { error: createError } = await withDeadline(
+          signUp.create({ emailAddress: address }),
+        );
         if (createError) throw createError;
-        const { error: sendError } = await signUp.verifications.sendEmailCode();
+        const { error: sendError } = await withDeadline(
+          signUp.verifications.sendEmailCode(),
+        );
         if (sendError) throw sendError;
         startedAsSignUp = true;
       } else {
-        const { error: createError } = await signIn.create({
-          identifier: address,
-        });
+        const { error: createError } = await withDeadline(
+          signIn.create({ identifier: address }),
+        );
 
         if (createError) {
           const code = errorCode(createError);
@@ -541,17 +588,21 @@ function ClerkAuthPanelInner({
 
           // Not in Clerk yet — an existing Jova/Appwrite user. Create the
           // Clerk identity so they can verify this address and get in.
-          const { error: suError } = await signUp.create({
-            emailAddress: address,
-          });
+          const { error: suError } = await withDeadline(
+            signUp.create({ emailAddress: address }),
+          );
           if (suError) throw suError;
-          const { error: sendError } = await signUp.verifications.sendEmailCode();
+          const { error: sendError } = await withDeadline(
+            signUp.verifications.sendEmailCode(),
+          );
           if (sendError) throw sendError;
           startedAsSignUp = true;
         } else {
           // The address is known to Clerk. `sendCode()` with no arguments
           // targets the identifier the sign-in was just created with.
-          const { error: sendError } = await signIn.emailCode.sendCode();
+          const { error: sendError } = await withDeadline(
+            signIn.emailCode.sendCode(),
+          );
           if (sendError) throw sendError;
         }
       }
@@ -590,27 +641,27 @@ function ClerkAuthPanelInner({
 
     try {
       if (codeFlow === "signup") {
-        const { error: verifyError } = await signUp.verifications.verifyEmailCode({
-          code: value,
-        });
+        const { error: verifyError } = await withDeadline(
+          signUp.verifications.verifyEmailCode({ code: value }),
+        );
         if (verifyError) throw verifyError;
         if (signUp.status !== "complete") {
           setBusy(null);
           setError("That code did not work. Check it and try again.");
           return;
         }
-        await signUp.finalize();
+        await withDeadline(signUp.finalize());
       } else {
-        const { error: verifyError } = await signIn.emailCode.verifyCode({
-          code: value,
-        });
+        const { error: verifyError } = await withDeadline(
+          signIn.emailCode.verifyCode({ code: value }),
+        );
         if (verifyError) throw verifyError;
         if (signIn.status !== "complete") {
           setBusy(null);
           setError("That code did not work. Check it and try again.");
           return;
         }
-        await signIn.finalize();
+        await withDeadline(signIn.finalize());
       }
 
       await finish({ mode, role });
