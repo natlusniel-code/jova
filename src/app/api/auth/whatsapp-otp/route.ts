@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHmac, randomInt } from "node:crypto";
+import { createHmac, randomBytes, randomInt } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { mintSession } from "@/lib/auth/local";
 import { postAuthDestination } from "@/lib/post-auth";
@@ -91,7 +91,9 @@ export async function POST(request: NextRequest) {
         const chosenRole = body?.role === "seller" ? "seller" : "buyer";
         const created = await admin.auth.admin.createUser({
           email,
-          password: randomInt(0, 0x7fffffff).toString(16) + crypto.randomUUID() + crypto.randomUUID(),
+          // Supabase Auth uses bcrypt, which accepts at most 72 password bytes.
+          // 32 random bytes encoded as base64url produce a 43-character password.
+          password: randomBytes(32).toString("base64url"),
           email_confirm: true,
           user_metadata: { phone, role: chosenRole, auth_provider: "whatsapp_otp" },
         });
