@@ -137,11 +137,25 @@ export default function SsoCallbackPage() {
         navigateToApp={() => {
           void finish();
         }}
-        // The sign-in needs another step, such as MFA. The login page explains
-        // the code option, which is the way through for this instance.
-        navigateToSignIn={() => router.replace("/auth")}
+        // Preserve the original intent when Clerk needs another step after
+        // the provider handshake. Dropping role/next here used to send sellers
+        // to the buyer storefront and could lose the requested destination.
+        navigateToSignIn={() => {
+          const params = new URLSearchParams(window.location.search);
+          const query = new URLSearchParams();
+          const next = safeNextPath(params.get("next"));
+          if (next) query.set("next", next);
+          router.replace(`/auth${query.size ? `?${query.toString()}` : ""}`);
+        }}
         // The sign-up needs more information before it can complete.
-        navigateToSignUp={() => router.replace("/signup")}
+        navigateToSignUp={() => {
+          const params = new URLSearchParams(window.location.search);
+          const query = new URLSearchParams();
+          query.set("role", params.get("role") === "seller" ? "seller" : "buyer");
+          const next = safeNextPath(params.get("next"));
+          if (next) query.set("next", next);
+          router.replace(`/signup?${query.toString()}`);
+        }}
       />
     </div>
   );
