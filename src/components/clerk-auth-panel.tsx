@@ -200,6 +200,24 @@ function ClerkAuthPanelInner({
       if (first?.code === "rate_limit_exceeded") {
         return "Too many attempts in a short time. Wait a minute, then try again — or use a different sign-in method.";
       }
+      // ── The password tab's three real dead ends ─────────────────────────────
+      // Clerk answers `strategy_for_user_invalid` for an account that EXISTS but
+      // has no password on it — every Appwrite/Google user, because they signed
+      // up through OAuth. Its own longMessage is the developer string "Invalid
+      // verification strategy", which reads like the site is broken. The person
+      // can get in, just not with a password they never set, so say that.
+      if (first?.code === "strategy_for_user_invalid") {
+        return "That account has no password yet — it was created with Google, Apple or LinkedIn. Use “Email code” below, or sign in with that provider.";
+      }
+      // Signing up with an address that already has a Clerk identity. Usually an
+      // OAuth user trying to add a password by registering again.
+      if (first?.code === "form_identifier_exists") {
+        return "An account already exists for that email. Log in instead — or, if you signed up with Google, use “Email code”.";
+      }
+      // Clerk enforces Have I Been Pwned on this instance.
+      if (first?.code === "form_password_pwned") {
+        return "That password appears in a known data breach. Choose a different one — longer is better.";
+      }
       if (first?.code?.startsWith("protect_") || /turnstile|protect check/i.test(first?.message ?? "")) {
         return "We could not verify this browser. Turn off any ad or privacy blocker for this site, then try again — or use a different sign-in method.";
       }
@@ -454,12 +472,18 @@ function ClerkAuthPanelInner({
         return;
       }
 
-      // A second factor is configured on the instance. Send them to the code
-      // step rather than leaving them on a spinner with no explanation.
-      if (signIn.status === "needs_second_factor") {
+      // A second step is configured on the instance: either a real second
+      // factor, or Device Trust challenging an unrecognised browser. Both mean
+      // Clerk will not hand out a session from this password alone, so send the
+      // person to the code step with an explanation instead of leaving the
+      // button spinning.
+      if (
+        signIn.status === "needs_second_factor" ||
+        signIn.status === "needs_client_trust"
+      ) {
         setBusy(null);
         setError(
-          "Your account needs a second step. Use “Email me a code” below to finish signing in.",
+          "Your account needs one more step. Use “Email code” below to finish signing in.",
         );
         return;
       }
