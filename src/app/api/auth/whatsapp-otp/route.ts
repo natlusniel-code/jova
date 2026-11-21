@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     if (action === "request") {
       const localPhone = "0" + phone.slice(3);
-      const { data: profile, error } = await admin.from("profiles").select("id, role").or(`phone.eq.${phone},phone.eq.+${phone},phone.eq.${localPhone}`).maybeSingle();
+      const { data: profile, error } = await admin.from("profiles").select("id, role").in("phone", [phone, "+" + phone, localPhone]).maybeSingle();
       if (error) throw error;
       if (purpose === "signup" && profile) return NextResponse.json({ error: "This phone number already has a Jova account. Please log in." }, { status: 409 });
       if (purpose === "login" && !profile) return NextResponse.json({ error: "No Jova account was found for this phone number. Please sign up first." }, { status: 404 });
@@ -74,6 +74,8 @@ export async function POST(request: NextRequest) {
         const messages: Record<string, string> = { expired: "That code has expired. Request a new one.", locked: "Too many incorrect attempts. Request a new code.", mismatch: "That code is incorrect.", no_code: "Request a new code first." };
         return NextResponse.json({ error: messages[checked.data?.reason] ?? "Could not verify that code.", attemptsLeft: checked.data?.attempts_left }, { status: 400 });
       }
+
+      if (checked.data.purpose !== purpose) return NextResponse.json({ error: "That code was issued for a different action. Request a new code." }, { status: 400 });
 
       let email = syntheticEmail(phone);
       let userId = String(checked.data.user_id);
