@@ -110,16 +110,16 @@ export async function mintSession(email: string): Promise<void> {
 
   if (!hashed) throw new Error("Could not start a session: no token was issued.");
 
-  // Next 15: `cookies()` is async. The adapter below is async too, so the
-  // `await` stays here and `requestClient()` / `mintSession()` keep their
-  // existing signatures for every caller.
+  // Resolve the mutable Next.js cookie store once, then expose the
+  // synchronous getAll/setAll adapter expected by @supabase/ssr 0.5.x.
+  // This Server Action must write the cookies onto its outgoing response.
+  const cookieStore = await cookies();
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
-      async getAll() {
-        return (await cookies()).getAll();
+      getAll() {
+        return cookieStore.getAll();
       },
-      async setAll(cookiesToSet: CookieToSet[]) {
-        const cookieStore = await cookies();
+      setAll(cookiesToSet: CookieToSet[]) {
         cookiesToSet.forEach(({ name, value, options }) => {
           cookieStore.set(name, value, options);
         });
@@ -132,6 +132,17 @@ export async function mintSession(email: string): Promise<void> {
     token_hash: hashed,
   });
   if (verifyError) throw new Error(`Could not start a session: ${verifyError.message}`);
+
+  // Fail inside the action if Supabase did not establish a readable session;
+  // never send the browser to a destination that will immediately bounce to
+  // /auth again.
+  const { data: sessionData, error: sessionError } = await supabase.auth.getUser();
+  if (sessionError || !sessionData.user) {
+    throw new Error("Supabase did not establish your Jova session. Please try again.");
+  }
+  if (sessionData.user.email?.toLowerCase() !== email.trim().toLowerCase()) {
+    throw new Error("The Jova session belongs to a different email address. Please sign in again.");
+  }
 }
 
 /** The SSR client bound to the current request's cookies. */
