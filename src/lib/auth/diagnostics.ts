@@ -10,30 +10,29 @@ export { cookieNames, maskEmail };
 /**
  * Structured, correlation-ID auth diagnostics.
  *
- * ── Why this exists ──────────────────────────────────────────────────────────
- * The redirect bug survived a whole identity-provider swap (Clerk → Firebase)
- * because every stage of the sign-in chain failed *silently*: a swallowed
- * cookie write, a `catch {}` with no message, a `getUser()` that returned null
- * and was treated as "not signed in". Nothing in the logs connected the
- * Firebase success to the Supabase failure, so the symptom looked like "the
- * provider is broken" when the provider was fine.
+ * ── Why this exists ────────────────────────────────────────────────────────
+ * The redirect bug survived a whole identity-provider swap because every
+ * stage of the sign-in chain failed *silently*: a swallowed cookie write, a
+ * `catch {}` with no message, a `getUser()` that returned null and was treated
+ * as "not signed in". Nothing in the logs connected the successful credential
+ * check to the failed session, so the symptom looked like "the provider is
+ * broken" when the provider was fine.
  *
  * Every stage of the chain now emits one line carrying the SAME `cid`, so a
  * single login attempt can be read end to end:
  *
- *   firebase.verify → supabase.user.resolve → supabase.session.mint
+ *   supabase.user.resolve → supabase.session.mint
  *   → supabase.session.verify → redirect.destination
  *   → middleware.session → page.session
  *
- * ── What is NEVER logged ─────────────────────────────────────────────────────
- * Passwords, Firebase ID tokens, Supabase access/refresh tokens, API keys,
+ * ── What is NEVER logged ───────────────────────────────────────────────────
+ * Passwords, Supabase access/refresh tokens, API keys,
  * service-role keys, and complete cookie values. Cookie NAMES are logged
  * (they are not secret and are what you need to debug a missing cookie);
  * cookie values are not. Emails are masked to `a***@domain`.
  */
 
 export type AuthStage =
-  | "firebase.verify"
   | "supabase.user.resolve"
   | "supabase.session.mint"
   | "supabase.session.verify"

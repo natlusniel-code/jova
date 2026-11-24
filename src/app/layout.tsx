@@ -21,7 +21,7 @@ import "./reference.css";
 /**
  * The absolute origin this page is being served from.
  *
- * ── Why this reads the request instead of an env var ──────────────────────
+ * ── Why this reads the request instead of an env var ───────────────────────
  * The share card showed an empty image slot, and the cause was not the tags:
  * `og:image` pointed at `https://jova.ng/og-image.jpg`, and `jova.ng` has no
  * DNS record at all. Both `NEXT_PUBLIC_SITE_URL` and Vercel's own
@@ -103,7 +103,7 @@ export async function generateMetadata(): Promise<Metadata> {
       statusBarStyle: "default",
     },
     formatDetection: { telephone: false },
-    // ── Share card ────────────────────────────────────────────────────────
+    // ── Share card ──────────────────────────────────────────────────────────
     // One 1200×630 image for every surface. `summary_large_image` is what makes
     // X draw it full width instead of as a thumbnail beside the text.
     openGraph: {
@@ -151,16 +151,16 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // ── Why there is no ClerkProvider ─────────────────────────────────────────
-  // Firebase is the identity provider. Clerk is no longer part of the request
-  // path, and mounting `ClerkProvider` kept a second, competing auth SDK alive
-  // in the browser: it booted its own session, wrote its own cookies, and its
+  // ── Why there is no auth provider here ─────────────────────────────────────
+  // There is exactly one auth SDK in this app: Supabase. Clerk and Firebase
+  // are both gone. Mounting a second provider kept a competing session alive
+  // in the browser — it booted its own session, wrote its own cookies, and its
   // `signInUrl` / `afterSignOutUrl` pointed at `/auth`. That is a second
   // redirect authority in an app that must have exactly one.
   //
-  // Removing it also removes a build-time hazard: `ClerkProvider` throws at
-  // render when it has no publishable key, which would take the whole site down
-  // on any host without the variable.
+  // Removing it also removes a build-time hazard: a provider that throws at
+  // render when it has no publishable key would take the whole site down on
+  // any host without the variable.
   return (
     <html lang="en">
       <head>
@@ -175,7 +175,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           src/lib/install-app.ts.
         */}
         <script dangerouslySetInnerHTML={{ __html: INSTALL_CAPTURE_SCRIPT }} />
-        {/* ── Type ────────────────────────────────────────────────────────
+        {/* ── Type ──────────────────────────────────────────────────────────
             Plus Jakarta Sans for headings, Inter for body copy. Loaded from
             Google Fonts with `display=swap` so the first paint is never
             blocked by a font request; the CSS variables in globals.css name

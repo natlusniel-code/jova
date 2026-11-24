@@ -2,20 +2,20 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { completeGoogleProfileAction } from "@/app/auth/actions";
+import { completeProfileAction } from "@/app/auth/actions";
 import { NIGERIA_STATES, lgasFor, cn } from "@/lib/utils";
 import { Spinner, Alert } from "@/components/ui";
 
 /**
- * The buyer's last signup step after Google.
+ * The buyer's last signup step.
  *
- * Google already gave us the name and email, so this form asks only for what
+ * Signup already gave us the name and email, so this form asks only for what
  * is genuinely missing: a phone number and a local government. Both are
  * required — the phone is the password-reset factor, and the LGA decides which
  * sellers the buyer can order from.
  *
- * The name is shown but editable, because a Google display name is often not
- * the name someone wants on their orders ("Tunde A." rather than "Tunde
+ * The name is shown but editable, because the name typed at signup is often
+ * not the name someone wants on their orders ("Tunde A." rather than "Tunde
  * Adebayo"). It is prefilled, so the common case is one tap.
  */
 export function CompleteProfile({
@@ -58,7 +58,7 @@ export function CompleteProfile({
     fd.set("city", form.city);
 
     startTransition(async () => {
-      const result = await completeGoogleProfileAction(fd);
+      const result = await completeProfileAction(fd);
       if (!result.ok) {
         if (result.field) setErrors({ [result.field]: result.error });
         else setErrors({ form: result.error });
@@ -74,7 +74,7 @@ export function CompleteProfile({
       <div className="mb-5 flex items-center gap-2 text-[12px] font-semibold text-ink-400">
         <span className="flex items-center gap-1.5 text-brand-600">
           <span className="grid h-5 w-5 place-items-center rounded-full bg-brand-500 text-[11px] text-white">1</span>
-          Google
+          Account
         </span>
         <span className="h-px w-5 bg-slate-200" />
         <span className="flex items-center gap-1.5 text-brand-600">
@@ -92,8 +92,8 @@ export function CompleteProfile({
         Almost there
       </h1>
       <p className="mt-1 text-[13.5px] leading-relaxed text-ink-500">
-        Your Google account is connected. We just need two more things so sellers
-        can reach you and so we show you goods near you.
+        Your account is ready. We just need two more things so sellers can reach
+        you and so we show you goods near you.
       </p>
 
       <form onSubmit={submit} className="mt-5 space-y-3.5" noValidate>

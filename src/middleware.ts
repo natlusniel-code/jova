@@ -9,7 +9,7 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
  * The admin console path.
  *
  * It is deliberately unguessable rather than `/admin`, and that is NOT the
- * security \u2014 the gate below is. The path is kept as-is so existing links and
+ * security — the gate below is. The path is kept as-is so existing links and
  * bookmarks keep working.
  */
 const ADMIN_ROOT = "/admin-fuckliving";
@@ -23,39 +23,38 @@ const ADMIN_LOGIN = "/admin-fuckliving/login";
  * Two jobs, in this order:
  *
  *  1. Refresh the Supabase session on every request (the existing behaviour,
- *     unchanged \u2014 it degrades to "anonymous" rather than 500-ing the site).
+ *     unchanged — it degrades to "anonymous" rather than 500-ing the site).
  *  2. Gate the admin console.
  *
  * This is pulled out of `middleware` so the admin gate can be reasoned about
  * (and tested) on its own, separate from the session refresh. See `middleware`
  * at the bottom.
  *
- * \u2500\u2500 Why the admin gate lives here \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+ * ── Why the admin gate lives here ──────────────────────────────────────────
  * The console used to have no gate at all: the layout said so explicitly, on
  * the theory that server-side data fetching with the service-role key made it
- * safe. It does not. The key protects the transport, not the endpoint \u2014 any
+ * safe. It does not. The key protects the transport, not the endpoint — any
  * visitor who knew the URL could open the dashboard and, through the Server
  * Actions, verify payments and release payouts.
  *
- * \u2500\u2500 Why a non-admin gets a 404 and not a redirect \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+ * ── Why a non-admin gets a 404 and not a redirect ──────────────────────────
  * A redirect to the login page would confirm that the console exists and that
  * the account simply lacks the role. A 404 says nothing: to a non-admin the
  * path is indistinguishable from a typo. The login page itself is exempt, so
  * an admin can still get in.
  *
- * \u2500\u2500 Why the admin check is a query and not a JWT claim \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+ * ── Why the admin check is a query and not a JWT claim ─────────────────────
  * `is_admin()` reads `public.admin_users`. A claim in the token could be
  * stale after a demotion, and `user_metadata` is client-writable. The row is
  * the truth, so the row is what is read. The `admin_users_self` RLS policy
  * lets a signed-in user select their own row, which is exactly this query.
  *
- * \u2500\u2500 Why the admin gate does NOT read the identity provider \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
- * Firebase tells us WHO someone is; it does not know that they are a Jova admin.
+ * ── Why the admin gate does NOT read a token claim ─────────────────────────
  * Admin status lives in `public.admin_users`, keyed on the Supabase user id,
- * and is granted there. So the gate keeps reading the Supabase session and the
- * `admin_users` row. Switching it to an identity-provider claim would move the
- * source of truth for a security decision into the identity provider, where a
- * demotion would not take effect until the next token refresh.
+ * and is granted there. So the gate reads the Supabase session and the
+ * `admin_users` row. Reading it from a token claim instead would move the
+ * source of truth for a security decision into the token, where a demotion
+ * would not take effect until the next refresh.
  */
 async function handleRequest(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
@@ -88,7 +87,7 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
       data: { user },
     } = await supabase.auth.getUser();
 
-    // No session at all \u2192 the admin login page.
+    // No session at all → the admin login page.
     if (!user) {
       const url = request.nextUrl.clone();
       url.pathname = ADMIN_LOGIN;
@@ -98,7 +97,7 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
       return NextResponse.redirect(url);
     }
 
-    // A session that is not an admin \u2192 404, revealing nothing.
+    // A session that is not an admin → 404, revealing nothing.
     const { data: adminRow } = await supabase
       .from("admin_users")
       .select("user_id")
@@ -125,10 +124,8 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
 }
 
 /**
- * Firebase is the public identity provider and has no server-readable session
- * cookie, so there is no provider middleware to run here. Supabase remains the
- * app session authority and its refresh/admin gate runs for every matched
- * request.
+ * Supabase is the only auth authority: it holds the session cookie and the
+ * user records. Its refresh and admin gate run for every matched request.
  */
 export async function middleware(request: NextRequest) {
   return handleRequest(request);
