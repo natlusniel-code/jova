@@ -3,8 +3,16 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
+const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+
+if (!apiKey) {
+  throw new Error(
+    "Firebase is not configured: NEXT_PUBLIC_FIREBASE_API_KEY is missing."
+  );
+}
+
 const firebaseConfig = {
-  apiKey: "AIzaSyBTx75UdDHEUde00H-S7PZImZ4yLhnrYw",
+  apiKey,
   authDomain: "jova-authentication.firebaseapp.com",
   projectId: "jova-authentication",
   storageBucket: "jova-authentication.firebasestorage.app",
