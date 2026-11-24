@@ -122,7 +122,6 @@ export function FirebaseAuthPanel({
         const credential = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
         await sendEmailVerification(credential.user, {
           url: `${window.location.origin}/auth/verify?role=${role}${next ? `&next=${encodeURIComponent(next)}` : ""}`,
-          handleCodeInApp: true,
         });
         setNotice("We've sent you a verification link. Open it to verify your email, then log in.");
         return;
