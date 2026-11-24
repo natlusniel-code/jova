@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  AppleAuthProvider,
+  OAuthProvider,
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
   sendEmailVerification,
@@ -102,7 +102,7 @@ export function FirebaseAuthPanel({
       const authProvider =
         provider === "google"
           ? new GoogleAuthProvider()
-          : new AppleAuthProvider();
+          : new OAuthProvider("apple.com");
       authProvider.setCustomParameters({ prompt: "select_account" });
       if (provider === "apple") {
         authProvider.addScope("email");
