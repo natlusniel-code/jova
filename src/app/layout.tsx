@@ -1,13 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { headers } from "next/headers";
-import { ClerkProvider } from "@clerk/nextjs";
 import { INSTALL_CAPTURE_SCRIPT } from "@/lib/install-capture";
 import { GlobalLoader } from "@/components/global-loader";
 import { GlobalLoaderTriggers } from "@/components/global-loader-triggers";
 import { NotificationBridge } from "@/components/notification-bridge";
-import { CLERK_PUBLISHABLE_KEY, CLERK_CONFIGURED } from "@/lib/clerk/config";
-import { clerkAppearance } from "@/lib/clerk/appearance";
 import "./globals.css";
 // Responsive guards, imported separately so globals.css stays as it was.
 import "./responsive-guards.css";
@@ -74,75 +71,75 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: {
       canonical: "/",
     },
-  title: {
-    default: "Jova Marketplace — buy and hire from verified sellers in your state",
-    template: "%s · Jova Marketplace",
-  },
-  description:
-    "Jova Marketplace is a Nigerian marketplace for goods and services. We hold your money in escrow until you confirm delivery.",
-  applicationName: "Jova Marketplace",
-  authors: [{ name: "Jova Marketplace" }],
-  keywords: [
-    "Jova",
-    "Jova Marketplace",
-    "Nigeria marketplace",
-    "buy and sell Nigeria",
-    "hire services Nigeria",
-    "escrow marketplace",
-  ],
-  icons: {
-    icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
-      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
-    ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
-    shortcut: ["/favicon.ico"],
-  },
-  manifest: "/manifest.webmanifest",
-  appleWebApp: {
-    capable: true,
-    title: "Jova",
-    statusBarStyle: "default",
-  },
-  formatDetection: { telephone: false },
-  // ── Share card ────────────────────────────────────────────────────────
-  // One 1200×630 image for every surface. `summary_large_image` is what makes
-  // X draw it full width instead of as a thumbnail beside the text.
-  openGraph: {
-    type: "website",
-    siteName: "Jova Marketplace",
-    title: "Jova Marketplace — buy and hire from verified sellers",
+    title: {
+      default: "Jova Marketplace — buy and hire from verified sellers in your state",
+      template: "%s · Jova Marketplace",
+    },
     description:
-      "Buy and hire from verified sellers in your state. Escrow-protected, so you pay only when you accept.",
-    url: "/",
-    locale: "en_NG",
-    images: [
-      {
-        url: "/og-image.jpg",
-        // `type` is not required by the spec, but several fetchers (WhatsApp's
-        // in particular) are stricter than the spec and will skip an image they
-        // cannot type from the URL alone.
-        //
-        // No `secureUrl`: Next does not resolve that field against
-        // `metadataBase`, so it emitted a relative `/og-image.jpg` — which is
-        // worse than omitting it, because a fetcher that prefers `secure_url`
-        // would then have a URL it cannot fetch. `og:image` above is already
-        // absolute and https, which is all the spec asks for.
-        type: "image/jpeg",
-        width: 1200,
-        height: 630,
-        alt: "Jova Marketplace — buy and hire from verified sellers in your state",
-      },
+      "Jova Marketplace is a Nigerian marketplace for goods and services. We hold your money in escrow until you confirm delivery.",
+    applicationName: "Jova Marketplace",
+    authors: [{ name: "Jova Marketplace" }],
+    keywords: [
+      "Jova",
+      "Jova Marketplace",
+      "Nigeria marketplace",
+      "buy and sell Nigeria",
+      "hire services Nigeria",
+      "escrow marketplace",
     ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Jova Marketplace — buy and hire from verified sellers",
-    description:
-      "Buy and hire from verified sellers in your state. Escrow-protected, so you pay only when you accept.",
-    images: [{ url: "/og-image.jpg", alt: "Jova Marketplace" }],
-  },
+    icons: {
+      icon: [
+        { url: "/favicon.ico", sizes: "any" },
+        { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+        { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
+      ],
+      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+      shortcut: ["/favicon.ico"],
+    },
+    manifest: "/manifest.webmanifest",
+    appleWebApp: {
+      capable: true,
+      title: "Jova",
+      statusBarStyle: "default",
+    },
+    formatDetection: { telephone: false },
+    // ── Share card ────────────────────────────────────────────────────────
+    // One 1200×630 image for every surface. `summary_large_image` is what makes
+    // X draw it full width instead of as a thumbnail beside the text.
+    openGraph: {
+      type: "website",
+      siteName: "Jova Marketplace",
+      title: "Jova Marketplace — buy and hire from verified sellers",
+      description:
+        "Buy and hire from verified sellers in your state. Escrow-protected, so you pay only when you accept.",
+      url: "/",
+      locale: "en_NG",
+      images: [
+        {
+          url: "/og-image.jpg",
+          // `type` is not required by the spec, but several fetchers (WhatsApp's
+          // in particular) are stricter than the spec and will skip an image they
+          // cannot type from the URL alone.
+          //
+          // No `secureUrl`: Next does not resolve that field against
+          // `metadataBase`, so it emitted a relative `/og-image.jpg` — which is
+          // worse than omitting it, because a fetcher that prefers `secure_url`
+          // would then have a URL it cannot fetch. `og:image` above is already
+          // absolute and https, which is all the spec asks for.
+          type: "image/jpeg",
+          width: 1200,
+          height: 630,
+          alt: "Jova Marketplace — buy and hire from verified sellers in your state",
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Jova Marketplace — buy and hire from verified sellers",
+      description:
+        "Buy and hire from verified sellers in your state. Escrow-protected, so you pay only when you accept.",
+      images: [{ url: "/og-image.jpg", alt: "Jova Marketplace" }],
+    },
   };
 }
 
@@ -154,17 +151,17 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // ── Why the provider is conditional ────────────────────────────────────────
-  // `ClerkProvider` THROWS at render time when it has no publishable key
-  // ("Missing publishableKey"). That would make `next build` fail on any host
-  // that has not been given the key yet — including a fresh clone and CI — and
-  // it would take the whole site down, not just the auth pages.
+  // ── Why there is no ClerkProvider ─────────────────────────────────────────
+  // Firebase is the identity provider. Clerk is no longer part of the request
+  // path, and mounting `ClerkProvider` kept a second, competing auth SDK alive
+  // in the browser: it booted its own session, wrote its own cookies, and its
+  // `signInUrl` / `afterSignOutUrl` pointed at `/auth`. That is a second
+  // redirect authority in an app that must have exactly one.
   //
-  // So the provider is mounted only when a key exists. Without one the app
-  // still builds and every non-auth page still renders; the auth panel shows a
-  // clear "sign-in is not configured" notice instead of a blank crash. That is
-  // the same fail-loudly-but-stay-up rule the Supabase config follows.
-  const tree = (
+  // Removing it also removes a build-time hazard: `ClerkProvider` throws at
+  // render when it has no publishable key, which would take the whole site down
+  // on any host without the variable.
+  return (
     <html lang="en">
       <head>
         {/*
@@ -210,23 +207,5 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
       </body>
     </html>
-  );
-
-  if (!CLERK_CONFIGURED) return tree;
-
-  return (
-    <ClerkProvider
-      publishableKey={CLERK_PUBLISHABLE_KEY}
-      appearance={clerkAppearance}
-      // The auth pages are the only place Clerk's own UI can appear (the
-      // "continue" screens during an OAuth handshake). Sending those to our
-      // own pages keeps the person inside Jova's design instead of landing on
-      // a hosted Clerk screen.
-      signInUrl="/auth"
-      signUpUrl="/signup"
-      afterSignOutUrl="/auth"
-    >
-      {tree}
-    </ClerkProvider>
   );
 }
