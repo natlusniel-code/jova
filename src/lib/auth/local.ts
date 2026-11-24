@@ -4,6 +4,13 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
+import {
+  authFail,
+  authOk,
+  cookieNames,
+  maskEmail,
+  newCorrelationId,
+} from "@/lib/auth/diagnostics";
 
 type CookieToSet = {
   name: string;
@@ -12,32 +19,32 @@ type CookieToSet = {
 };
 
 /**
- * Jova's session plumbing — server side.
+ * Jova's session plumbing - server side.
  *
- * ── What this file is now ───────────────────────────────────────────────────
+ * -- What this file is now ---------------------------------------------------
  * Google is the only way into the marketplace, so there is no password store
  * to read and no account to create here. What remains is the machinery that
  * turns a verified identity into a Supabase session, because every table in
  * this project is protected by RLS keyed on `auth.uid()`:
  *
- *   • `mintSession`   — give an already-verified user a real Supabase session;
- *   • `requestClient` — the SSR client bound to the current request's cookies;
- *   • `checkPassword` — used ONLY by the separate admin console login, which
+ *   * `mintSession`   - give an already-verified user a real Supabase session;
+ *   * `requestClient` - the SSR client bound to the current request's cookies;
+ *   * `checkPassword` - used ONLY by the separate admin console login, which
  *                       is not part of the public sign-in surface.
  *
- * ── What was removed ────────────────────────────────────────────────────────
+ * -- What was removed --------------------------------------------------------
  * `createAccountUser`, `setPassword`, `emailTaken`, `phoneMatches`,
  * `accountHasPhone`, `issueCode` and `verifyCode` all served the email +
  * password signup, the email verification code, and the phone-based password
  * reset. All three flows are gone, so those functions are gone with them
  * rather than left as dead code that still looks callable.
  *
- * ── Why minting needs no password ───────────────────────────────────────────
+ * -- Why minting needs no password -------------------------------------------
  * `admin.generateLink({ type: "magiclink" })` returns a one-time
  * `hashed_token` for an existing user. `verifyOtp({ token_hash })` exchanges it
  * for a session and writes the auth cookies. The token is single-use and
  * expires in minutes, and it is only ever created on the server, after the
- * identity has already been proven — by Google, or by the admin console's own
+ * identity has already been proven - by Google, or by the admin console's own
  * password check. It is not a way in; it is the last step of a sign-in that
  * already succeeded.
  */
@@ -64,7 +71,7 @@ export async function checkPassword(email: string, password: string): Promise<Lo
     // Say so plainly instead of pretending the password was wrong.
     if (/could not find the function|does not exist/i.test(error.message)) {
       throw new Error(
-        "Sign-in is not set up on this database yet — run sql/0015_local_auth.sql in the Supabase SQL editor.",
+        "Sign-in is not set up on this database yet - run sql/0015_local_auth.sql in the Supabase SQL editor.",
       );
     }
     throw new Error(error.message);
@@ -90,17 +97,28 @@ export async function checkPassword(email: string, password: string): Promise<Lo
 /**
  * Give this user a Supabase session, writing the auth cookies.
  *
- * Must be called from a Server Action or Route Handler — `cookies()` is
+ * Must be called from a Server Action or Route Handler - `cookies()` is
  * read-only in a Server Component, and the write would be silently dropped.
+ *
+ * Returns the Supabase auth user id the session actually belongs to. The
+ * caller MUST use that id (not an id it looked up separately) to read the
+ * profile: when two profile rows share an email, Supabase's own resolution is
+ * the only answer that matches `auth.uid()`.
  */
-export async function mintSession(email: string): Promise<void> {
+export async function mintSession(
+  email: string,
+  cid: string = newCorrelationId(),
+): Promise<{ userId: string }> {
   const admin = createAdminClient();
 
   const { data, error } = await admin.auth.admin.generateLink({
     type: "magiclink",
     email,
   });
-  if (error) throw new Error(`Could not start a session: ${error.message}`);
+  if (error) {
+    authFail("supabase.session.mint", cid, { email: maskEmail(email) }, error);
+    throw new Error(`Could not start a session: ${error.message}`);
+  }
 
   // The shape differs between supabase-js versions: the token sits either at
   // the top level or under `properties`.
@@ -108,20 +126,31 @@ export async function mintSession(email: string): Promise<void> {
     (data as { hashed_token?: string })?.hashed_token ??
     (data as { properties?: { hashed_token?: string } })?.properties?.hashed_token;
 
-  if (!hashed) throw new Error("Could not start a session: no token was issued.");
+  if (!hashed) {
+    authFail("supabase.session.mint", cid, {
+      email: maskEmail(email),
+      reason: "no_token_issued",
+    });
+    throw new Error("Could not start a session: no token was issued.");
+  }
 
-  // Next 15: `cookies()` is async. The adapter below is async too, so the
-  // `await` stays here and `requestClient()` / `mintSession()` keep their
-  // existing signatures for every caller.
+  // Resolve the mutable Next.js cookie store once, then expose the
+  // synchronous getAll/setAll adapter expected by @supabase/ssr 0.5.x.
+  // This Server Action must write the cookies onto its outgoing response.
+  const cookieStore = await cookies();
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
-      async getAll() {
-        return (await cookies()).getAll();
+      getAll() {
+        return cookieStore.getAll();
       },
-      async setAll(cookiesToSet: CookieToSet[]) {
-        const cookieStore = await cookies();
+      setAll(cookiesToSet: CookieToSet[]) {
         cookiesToSet.forEach(({ name, value, options }) => {
           cookieStore.set(name, value, options);
+        });
+        // Names only - a session token must never reach the log stream.
+        authOk("supabase.session.mint", cid, {
+          event: "cookies.written",
+          cookie_names: cookieNames(cookiesToSet).join(","),
         });
       },
     },
@@ -131,7 +160,34 @@ export async function mintSession(email: string): Promise<void> {
     type: "magiclink",
     token_hash: hashed,
   });
-  if (verifyError) throw new Error(`Could not start a session: ${verifyError.message}`);
+  if (verifyError) {
+    authFail("supabase.session.mint", cid, { email: maskEmail(email) }, verifyError);
+    throw new Error(`Could not start a session: ${verifyError.message}`);
+  }
+
+  // Fail inside the action if Supabase did not establish a readable session;
+  // never send the browser to a destination that will immediately bounce to
+  // /auth again.
+  const { data: sessionData, error: sessionError } = await supabase.auth.getUser();
+  if (sessionError || !sessionData.user) {
+    authFail("supabase.session.verify", cid, { email: maskEmail(email) }, sessionError);
+    throw new Error("Supabase did not establish your Jova session. Please try again.");
+  }
+  if (sessionData.user.email?.toLowerCase() !== email.trim().toLowerCase()) {
+    authFail("supabase.session.verify", cid, {
+      email: maskEmail(email),
+      session_email: maskEmail(sessionData.user.email),
+      reason: "email_mismatch",
+    });
+    throw new Error("The Jova session belongs to a different email address. Please sign in again.");
+  }
+
+  authOk("supabase.session.verify", cid, {
+    email: maskEmail(email),
+    user_id: sessionData.user.id,
+  });
+
+  return { userId: sessionData.user.id };
 }
 
 /** The SSR client bound to the current request's cookies. */

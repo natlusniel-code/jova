@@ -9,13 +9,18 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "check:lga": "node scripts/check-lga.mjs",
-    "test": "node scripts/check-lga.mjs"
+    "test": "node scripts/check-lga.mjs",
+    "test:auth": "npx --yes tsx@4.19.2 --test tests/auth-lifecycle.test.ts",
+    "test:middleware": "npx --yes tsx@4.19.2 --test tests/middleware-cookie.test.ts",
+    "test:all": "npx --yes tsx@4.19.2 --test tests/auth-lifecycle.test.ts tests/middleware-cookie.test.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "7.10.6",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
     "clsx": "^2.1.1",
+    "firebase": "12.5.0",
+    "firebase-admin": "13.5.0",
     "next": "15.5.29",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -28,6 +33,7 @@
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.6",
+    "tsx": "^4.19.2",
     "typescript": "^5.5.3"
   }
 }

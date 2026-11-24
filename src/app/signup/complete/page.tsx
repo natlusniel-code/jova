@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { AuthSplit } from "@/components/auth-split";
 import { getSession } from "@/lib/supabase/server";
-import { hasClerkSessionWithoutJova } from "@/lib/auth/resume";
 import { CompleteProfile } from "@/components/signup/complete-profile";
 
 export const dynamic = "force-dynamic";
@@ -27,13 +26,15 @@ export const metadata = { title: "Finish your account" };
 export default async function SignupCompletePage() {
   const session = await getSession();
 
-  // No session: the round trip did not complete. If Clerk still holds a
-  // session, finish it rather than bouncing to the login form — that bounce is
-  // what made a half-finished sign-in look like a redirect loop.
+  // No session: the round trip did not complete. Send them to sign in with the
+  // destination preserved, so a successful sign-in comes straight back here.
+  //
+  // The old code first asked Clerk whether it still held a session and, if so,
+  // bounced to `/auth/resume`. That was the loop: `/auth/resume` could not mint
+  // a Supabase session (no Clerk secret key), so it redirected to `/auth`,
+  // which sent the person back here. Firebase has no server-side session to
+  // resume, so the check is gone and this is a single, honest redirect.
   if (!session) {
-    if (await hasClerkSessionWithoutJova()) {
-      redirect("/auth/resume?next=%2Fsignup%2Fcomplete");
-    }
     redirect("/auth?next=%2Fsignup%2Fcomplete");
   }
 

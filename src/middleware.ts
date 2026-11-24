@@ -1,9 +1,7 @@
-import { NextResponse, type NextRequest, type NextFetchEvent } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { clerkMiddleware } from "@clerk/nextjs/server";
 import { updateSession } from "@/lib/supabase/middleware";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
-import { CLERK_CONFIGURED } from "@/lib/clerk/config";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -127,53 +125,13 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
 }
 
 /**
- * Clerk's middleware, with the app's own work nested inside it.
- *
- * ── Why nested rather than sequenced ────────────────────────────────────────
- * `clerkMiddleware` is not a thing you call for its side effects and ignore.
- * It reads the Clerk session cookie, may attach `x-clerk-auth-*` request
- * headers, and — importantly — writes `Set-Cookie` headers onto the response it
- * returns, refreshing the Clerk session token as it ages. Calling it and
- * discarding its response, as an earlier draft did, would have thrown those
- * headers away and signed people out whenever their Clerk token rotated.
- *
- * So it goes on the OUTSIDE: Clerk runs its handler, we return our Supabase
- * response from inside that handler, and Clerk merges its own headers onto the
- * response we hand back. Both cookie sets survive, which is what "signed in to
- * Clerk AND signed in to Supabase" requires.
- *
- * ── What this enables ───────────────────────────────────────────────────────
- * `auth()` and `currentUser()` in Server Components and Server Actions only see
- * a session because this middleware ran. `bridgeClerkSession` depends on them,
- * so removing this breaks sign-in entirely.
+ * Firebase is the public identity provider. Do not run Clerk middleware here:
+ * the old Clerk wrapper must not participate in requests or response-cookie
+ * handling during the Firebase migration. Supabase remains the app session
+ * authority and its refresh/admin gate still runs for every matched request.
  */
-const withClerk = clerkMiddleware(async (_auth, request) => {
+export async function middleware(request: NextRequest) {
   return handleRequest(request);
-});
-
-/**
- * Middleware.
- *
- * Clerk first, then the app's own session refresh and admin gate. If Clerk
- * cannot run — no publishable key configured in this environment, or a Clerk
- * outage — the app's own work still runs, so the marketplace is readable
- * instead of returning 500 on every route. Sign-in then fails with a clear
- * message from the panel rather than the whole site going dark.
- */
-export async function middleware(request: NextRequest, event: NextFetchEvent) {
-  if (!CLERK_CONFIGURED) {
-    // No key: the Clerk SDK cannot boot at all. Do the app's work directly.
-    return handleRequest(request);
-  }
-
-  try {
-    return (await withClerk(request, event)) as NextResponse;
-  } catch (error) {
-    // Middleware runs in front of every route, so an unhandled throw here is a
-    // 500 for the entire site. Degrade to "anonymous" instead.
-    console.error("[middleware] Clerk failed, continuing without it:", error);
-    return handleRequest(request);
-  }
 }
 
 export const config = {
