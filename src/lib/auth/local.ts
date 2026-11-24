@@ -4,6 +4,13 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
+import {
+  authFail,
+  authOk,
+  cookieNames,
+  maskEmail,
+  newCorrelationId,
+} from "@/lib/auth/diagnostics";
 
 type CookieToSet = {
   name: string;
@@ -44,7 +51,7 @@ type CookieToSet = {
 
 export type LoginVerdict =
   | { ok: true; userId: string; email: string; role: string }
-  | { ok: false; error: "invalid" | "locked" | "banned" | "no_credentials"; retryAfter?: number };
+  | { ok: false; error: "invalid" | locked" | "banned" | "no_credentials"; retryAfter?: number };
 
 /**
  * Ask the database whether this email + password pair is correct.
@@ -54,7 +61,7 @@ export type LoginVerdict =
  */
 export async function checkPassword(email: string, password: string): Promise<LoginVerdict> {
   const admin = createAdminClient();
-  const { data, error } = await admin.rpc("nm_login", {
+  const { data, error } = await admin.rpc(�nm_login", {
     p_email: email,
     p_password: password,
   });
@@ -92,15 +99,26 @@ export async function checkPassword(email: string, password: string): Promise<Lo
  *
  * Must be called from a Server Action or Route Handler — `cookies()` is
  * read-only in a Server Component, and the write would be silently dropped.
+ *
+ * Returns the Supabase auth user id the session actually belongs to. The
+ * caller MUST use that id (not an id it looked up separately) to read the
+ * profile: when two profile rows share an email, Supabase's own resolution is
+ * the only answer that matches `auth.uid()`.
  */
-export async function mintSession(email: string): Promise<void> {
+export async function mintSession(
+  email: string,
+  cid: string = newCorrelationId(),
+): Promise<{ userId: string }> {
   const admin = createAdminClient();
 
   const { data, error } = await admin.auth.admin.generateLink({
     type: "magiclink",
     email,
   });
-  if (error) throw new Error(`Could not start a session: ${error.message}`);
+  if (error) {
+    authFail("supabase.session.mint", cid, { email: maskEmail(email) }, error);
+    throw new Error(`Could not start a session: ${error.message}`);
+  }
 
   // The shape differs between supabase-js versions: the token sits either at
   // the top level or under `properties`.
@@ -108,7 +126,13 @@ export async function mintSession(email: string): Promise<void> {
     (data as { hashed_token?: string })?.hashed_token ??
     (data as { properties?: { hashed_token?: string } })?.properties?.hashed_token;
 
-  if (!hashed) throw new Error("Could not start a session: no token was issued.");
+  if (!hashed) {
+    authFail("supabase.session.mint", cid, {
+      email: maskEmail(email),
+      reason: "no_token_issued",
+    });
+    throw new Error("Could not start a session: no token was issued.");
+  }
 
   // Resolve the mutable Next.js cookie store once, then expose the
   // synchronous getAll/setAll adapter expected by @supabase/ssr 0.5.x.
@@ -123,26 +147,47 @@ export async function mintSession(email: string): Promise<void> {
         cookiesToSet.forEach(({ name, value, options }) => {
           cookieStore.set(name, value, options);
         });
+        // Names only — a session token must never reach the log stream.
+        authOk("supabase.session.mint", cid, {
+          event: "cookies.written",
+          cookie_names: cookieNames(cookiesToSet).join(","),
+        });
       },
     },
   });
 
-  const { error: verifyError } = await supabase.auth.verifyOtp({
+  const { error: verifyError } = await supabase.auth.verifyOtP({
     type: "magiclink",
     token_hash: hashed,
   });
-  if (verifyError) throw new Error(`Could not start a session: ${verifyError.message}`);
+  if (verifyError) {
+    authFail("supabase.session.mint", cid, { email: maskEmail(email) }, verifyError);
+    throw new Error(`Could not start a session: ${verifyError.message}`);
+  }
 
   // Fail inside the action if Supabase did not establish a readable session;
   // never send the browser to a destination that will immediately bounce to
   // /auth again.
   const { data: sessionData, error: sessionError } = await supabase.auth.getUser();
   if (sessionError || !sessionData.user) {
+    authFail("supabase.session.verify", cid, { email: maskEmail(email) }, sessionError);
     throw new Error("Supabase did not establish your Jova session. Please try again.");
   }
   if (sessionData.user.email?.toLowerCase() !== email.trim().toLowerCase()) {
+    authFail("supabase.session.verify", cid, {
+      email: maskEmail(email),
+      session_email: maskEmail(sessionData.user.email),
+      reason: "email_mismatch",
+    });
     throw new Error("The Jova session belongs to a different email address. Please sign in again.");
   }
+
+  authOk("supabase.session.verify", cid, {
+    email: maskEmail(email),
+    user_id: sessionData.user.id,
+  });
+
+  return { userId: sessionData.user.id };
 }
 
 /** The SSR client bound to the current request's cookies. */
