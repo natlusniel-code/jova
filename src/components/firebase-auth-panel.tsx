@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   OAuthProvider,
   GoogleAuthProvider,
@@ -36,7 +35,6 @@ export function FirebaseAuthPanel({
   next?: string;
   initialRole?: Role | null;
 }) {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>(initialRole ?? "buyer");
@@ -66,8 +64,9 @@ export function FirebaseAuthPanel({
           setError(bridged.error);
           return;
         }
-        router.replace(bridged.next);
-        router.refresh();
+        // A full navigation waits for the Server Action response (including
+        // the new Supabase Set-Cookie header) before the destination loads.
+        window.location.assign(bridged.next);
       } catch (e) {
         if (!active) return;
         setError(e instanceof Error ? e.message : "Sign-in failed. Please try again.");
@@ -77,7 +76,7 @@ export function FirebaseAuthPanel({
     return () => {
       active = false;
     };
-  }, [mode, role, next, router]);
+  }, [mode, role, next]);
 
   async function complete(user: import("firebase/auth").User, authMode: "signin" | "signup") {
     if (!user.emailVerified) {
@@ -89,8 +88,9 @@ export function FirebaseAuthPanel({
       setError(result.error);
       return;
     }
-    router.replace(result.next);
-    router.refresh();
+    // The bridge sets the Supabase session cookie on this response. Use a
+    // document navigation so the next request reads that cookie immediately.
+    window.location.assign(result.next);
   }
 
   async function withBusy(task: () => Promise<void>) {
