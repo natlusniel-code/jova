@@ -19,39 +19,39 @@ type CookieToSet = {
 };
 
 /**
- * Jova's session plumbing — server side.
+ * Jova's session plumbing - server side.
  *
- * ── What this file is now ───────────────────────────────────────────────────
+ * -- What this file is now ---------------------------------------------------
  * Google is the only way into the marketplace, so there is no password store
  * to read and no account to create here. What remains is the machinery that
  * turns a verified identity into a Supabase session, because every table in
  * this project is protected by RLS keyed on `auth.uid()`:
  *
- *   • `mintSession`   — give an already-verified user a real Supabase session;
- *   • `requestClient` — the SSR client bound to the current request's cookies;
- *   • `checkPassword` — used ONLY by the separate admin console login, which
+ *   * `mintSession`   - give an already-verified user a real Supabase session;
+ *   * `requestClient` - the SSR client bound to the current request's cookies;
+ *   * `checkPassword` - used ONLY by the separate admin console login, which
  *                       is not part of the public sign-in surface.
  *
- * ── What was removed ────────────────────────────────────────────────────────
+ * -- What was removed --------------------------------------------------------
  * `createAccountUser`, `setPassword`, `emailTaken`, `phoneMatches`,
  * `accountHasPhone`, `issueCode` and `verifyCode` all served the email +
  * password signup, the email verification code, and the phone-based password
  * reset. All three flows are gone, so those functions are gone with them
  * rather than left as dead code that still looks callable.
  *
- * ── Why minting needs no password ───────────────────────────────────────────
+ * -- Why minting needs no password -------------------------------------------
  * `admin.generateLink({ type: "magiclink" })` returns a one-time
  * `hashed_token` for an existing user. `verifyOtp({ token_hash })` exchanges it
  * for a session and writes the auth cookies. The token is single-use and
  * expires in minutes, and it is only ever created on the server, after the
- * identity has already been proven — by Google, or by the admin console's own
+ * identity has already been proven - by Google, or by the admin console's own
  * password check. It is not a way in; it is the last step of a sign-in that
  * already succeeded.
  */
 
 export type LoginVerdict =
   | { ok: true; userId: string; email: string; role: string }
-  | { ok: false; error: "invalid" | locked" | "banned" | "no_credentials"; retryAfter?: number };
+  | { ok: false; error: "invalid" | "locked" | "banned" | "no_credentials"; retryAfter?: number };
 
 /**
  * Ask the database whether this email + password pair is correct.
@@ -61,7 +61,7 @@ export type LoginVerdict =
  */
 export async function checkPassword(email: string, password: string): Promise<LoginVerdict> {
   const admin = createAdminClient();
-  const { data, error } = await admin.rpc(�nm_login", {
+  const { data, error } = await admin.rpc("nm_login", {
     p_email: email,
     p_password: password,
   });
@@ -71,7 +71,7 @@ export async function checkPassword(email: string, password: string): Promise<Lo
     // Say so plainly instead of pretending the password was wrong.
     if (/could not find the function|does not exist/i.test(error.message)) {
       throw new Error(
-        "Sign-in is not set up on this database yet — run sql/0015_local_auth.sql in the Supabase SQL editor.",
+        "Sign-in is not set up on this database yet - run sql/0015_local_auth.sql in the Supabase SQL editor.",
       );
     }
     throw new Error(error.message);
@@ -97,7 +97,7 @@ export async function checkPassword(email: string, password: string): Promise<Lo
 /**
  * Give this user a Supabase session, writing the auth cookies.
  *
- * Must be called from a Server Action or Route Handler — `cookies()` is
+ * Must be called from a Server Action or Route Handler - `cookies()` is
  * read-only in a Server Component, and the write would be silently dropped.
  *
  * Returns the Supabase auth user id the session actually belongs to. The
@@ -147,7 +147,7 @@ export async function mintSession(
         cookiesToSet.forEach(({ name, value, options }) => {
           cookieStore.set(name, value, options);
         });
-        // Names only — a session token must never reach the log stream.
+        // Names only - a session token must never reach the log stream.
         authOk("supabase.session.mint", cid, {
           event: "cookies.written",
           cookie_names: cookieNames(cookiesToSet).join(","),
@@ -156,7 +156,7 @@ export async function mintSession(
     },
   });
 
-  const { error: verifyError } = await supabase.auth.verifyOtP({
+  const { error: verifyError } = await supabase.auth.verifyOtp({
     type: "magiclink",
     token_hash: hashed,
   });
