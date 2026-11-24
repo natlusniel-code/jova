@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -9,7 +9,8 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
   signInWithEmailAndPassword,
-  signInWithPopup,
+  getRedirectResult,
+  signInWithRedirect,
 } from "firebase/auth";
 import { firebaseAuth } from "@/lib/firebase/client";
 import { bridgeFirebaseSession } from "@/app/auth/firebase-actions";
@@ -42,6 +43,41 @@ export function FirebaseAuthPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    async function finishRedirectSignIn() {
+      try {
+        const result = await getRedirectResult(firebaseAuth);
+        if (!result || !active) return;
+        if (!result.user.emailVerified) {
+          setNotice("Check your email and click the verification link before signing in.");
+          return;
+        }
+        const idToken = await result.user.getIdToken(true);
+        const bridged = await bridgeFirebaseSession({
+          idToken,
+          mode,
+          role,
+          next,
+        });
+        if (!active) return;
+        if (!bridged.ok) {
+          setError(bridged.error);
+          return;
+        }
+        router.replace(bridged.next);
+        router.refresh();
+      } catch (e) {
+        if (!active) return;
+        setError(e instanceof Error ? e.message : "Sign-in failed. Please try again.");
+      }
+    }
+    void finishRedirectSignIn();
+    return () => {
+      active = false;
+    };
+  }, [mode, role, next, router]);
 
   async function complete(user: import("firebase/auth").User, authMode: "signin" | "signup") {
     if (!user.emailVerified) {
@@ -108,8 +144,7 @@ export function FirebaseAuthPanel({
         authProvider.addScope("email");
         authProvider.addScope("name");
       }
-      const credential = await signInWithPopup(firebaseAuth, authProvider);
-      await complete(credential.user, mode);
+      await signInWithRedirect(firebaseAuth, authProvider);
     });
   }
 
