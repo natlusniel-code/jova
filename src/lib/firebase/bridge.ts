@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { mintSession, requestClient } from "@/lib/auth/local";
 import { postAuthDestination } from "@/lib/post-auth";
 import { verifyFirebaseIdToken } from "@/lib/firebase/admin";
+import { safeNextPath } from "@/lib/safe-next";
 
 type Role = "buyer" | "seller";
 
@@ -100,13 +101,7 @@ export async function bridgeFirebaseSession(input: {
   try {
     const identity = await verifyFirebaseIdToken(input.idToken);
     const role: Role = input.role === "seller" ? "seller" : "buyer";
-    const next =
-      typeof input.next === "string" &&
-      input.next.startsWith("/") &&
-      !input.next.startsWith("//") &&
-      !input.next.startsWith("/auth")
-        ? input.next
-        : null;
+    const next = safeNextPath(input.next);
 
     const resolved = await findOrCreateFirebaseUser(
       identity,
