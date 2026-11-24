@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { firebaseAuth } from "@/lib/firebase/client";
 import { bridgeFirebaseSession } from "@/app/auth/firebase-actions";
 
@@ -12,7 +11,6 @@ export function FirebaseVerifyClient({
   role: "buyer" | "seller";
   next: string | null;
 }) {
-  const router = useRouter();
   const [message, setMessage] = useState("Your email has been verified. Finishing your Jova account…");
   const [failed, setFailed] = useState(false);
 
@@ -24,7 +22,7 @@ export function FirebaseVerifyClient({
         if (!user) {
           if (active) {
             setMessage("Your email is verified. You can now log in to Jova.");
-            window.setTimeout(() => router.replace("/auth"), 1800);
+            window.setTimeout(() => window.location.assign("/auth"), 1800);
           }
           return;
         }
@@ -36,7 +34,7 @@ export function FirebaseVerifyClient({
         const idToken = await user.getIdToken(true);
         const result = await bridgeFirebaseSession({ idToken, mode: "signup", role, next });
         if (!result.ok) throw new Error(result.error);
-        if (active) router.replace(result.next);
+        if (active) window.location.assign(result.next);
       } catch (error) {
         if (!active) return;
         setMessage(error instanceof Error ? error.message : "We could not finish your account. Please log in.");
@@ -47,7 +45,7 @@ export function FirebaseVerifyClient({
     return () => {
       active = false;
     };
-  }, [role, next, router]);
+  }, [role, next]);
 
   return (
     <main className="grid min-h-dvh place-items-center bg-[var(--canvas)] px-5">
@@ -57,7 +55,7 @@ export function FirebaseVerifyClient({
         </h1>
         <p role="status" className="mt-3 text-sm leading-relaxed text-ink-600">{message}</p>
         {failed ? (
-          <button type="button" onClick={() => router.replace("/auth")} className="mt-5 rounded-xl bg-brand-700 px-5 py-3 text-sm font-bold text-white">
+          <button type="button" onClick={() => window.location.assign("/auth")} className="mt-5 rounded-xl bg-brand-700 px-5 py-3 text-sm font-bold text-white">
             Go to login
           </button>
         ) : null}
