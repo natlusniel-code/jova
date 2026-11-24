@@ -6,8 +6,8 @@ export const metadata = { title: "Sign in" };
  * `/signin` is a permanent redirect to the new LOGIN page, `/auth`.
  *
  * ── Why this is a redirect and not a page ───────────────────────────────────
- * The email + password form that used to live here is gone: Google is the only
- * way in. But `/signin` is linked from roughly thirty places — every
+ * The form that used to live here now lives at `/auth`. But `/signin` is
+ * linked from roughly thirty places — every
  * `redirect("/signin?next=…")` guard in the shop and seller layouts, the
  * checkout prompt, the wishlist and chat buttons, old emails and bookmarks.
  *

@@ -2,47 +2,63 @@
 
 import { redirect } from "next/navigation";
 import { requestClient } from "@/lib/auth/local";
+import {
+  signInWithPassword,
+  signUpWithPassword,
+  type PasswordAuthResult,
+} from "@/lib/auth/password";
 
 /**
- * The remaining auth actions.
+ * The email + password auth actions.
  *
- * \u2500\u2500 What used to be here \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
- * `signInAction`, `startSignupAction`, `startResetAction` and
- * `finishResetAction` \u2014 the whole email + password surface: password checks
- * against `account_credentials`, the legacy-password migration, the
- * "confirm your email" gate, and the phone-based password reset.
- *
- * All of it is gone. Sign-in is now handled by Firebase, which offers Google,
- * Apple, LinkedIn and email + password, so there is no password to check and
- * no password to reset. `bridgeFirebaseSession`
- * (`src/lib/firebase/bridge.ts`) turns a verified Firebase identity into the
- * Supabase session these helpers run against.
- *
- * What is left is the two things that are still real:
- *   \u2022 `completeGoogleProfileAction` \u2014 the buyer's last step after any provider
- *     or code sign-in, which collects the phone number and LGA that no
- *     identity provider hands us;
- *   \u2022 `signOutAction` \u2014 clearing the Supabase cookie.
+ * These are thin wrappers: the work lives in `src/lib/auth/password.ts`, which
+ * is the one place a session is established. Keeping the actions thin means
+ * there is a single implementation to reason about, and the same functions can
+ * be unit-tested without a Next.js request.
  */
 
 export type ActionResult =
   | { ok: true; next?: string }
   | { ok: false; error: string; field?: string };
 
+/** Sign in an existing Supabase account with its email and password. */
+export async function signInAction(formData: FormData): Promise<ActionResult> {
+  const email = String(formData.get("email") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const next = formData.get("next") ? String(formData.get("next")) : null;
+
+  const result: PasswordAuthResult = await signInWithPassword(email, password, next);
+  return result.ok ? { ok: true, next: result.next } : result;
+}
+
+/** Create an account with an email and password, then sign it in. */
+export async function signUpAction(formData: FormData): Promise<ActionResult> {
+  const email = String(formData.get("email") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const fullName = String(formData.get("full_name") ?? "");
+  const role = String(formData.get("role") ?? "buyer") === "seller" ? "seller" : "buyer";
+  const next = formData.get("next") ? String(formData.get("next")) : null;
+
+  const result: PasswordAuthResult = await signUpWithPassword({
+    email,
+    password,
+    fullName,
+    role,
+    next,
+  });
+  return result.ok ? { ok: true, next: result.next } : result;
+}
+
 /**
- * Save the phone number and local government a Google buyer still needs.
+ * Save the phone number and local government a buyer still needs.
  *
- * Google gives us a name and a verified email and nothing else. This writes
- * the two fields the marketplace actually depends on: the phone (how a seller
- * or support reaches them about an order) and the state/LGA (which decides
- * which sellers the buyer can order from).
- *
- * It writes to `profiles` through the request client, so RLS applies and the
- * row can only be the caller's own \u2014 the id is never taken from the form.
+ * Kept from the previous flow: an email signup collects a name and an email,
+ * but the marketplace also needs a phone (how a seller or support reaches them
+ * about an order) and a state/LGA (which decides which sellers they can order
+ * from). It writes through the request client, so RLS applies and the row can
+ * only ever be the caller's own — the id is never taken from the form.
  */
-export async function completeGoogleProfileAction(
-  formData: FormData,
-): Promise<ActionResult> {
+export async function completeProfileAction(formData: FormData): Promise<ActionResult> {
   const fullName = String(formData.get("full_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").replace(/\s/g, "");
   const state = String(formData.get("state") ?? "").trim();
@@ -72,15 +88,13 @@ export async function completeGoogleProfileAction(
       .update({ full_name: fullName, phone, state, city })
       .eq("id", user.id);
     if (error) {
-      console.error("[auth] could not save Google profile details", error);
+      console.error("[auth] could not save profile details", error);
       return {
         ok: false,
         error: "We couldn't save your details just now. Please try again.",
       };
     }
 
-    // A buyer goes to the storefront. A seller who somehow reached this page
-    // still has onboarding to finish, so they are sent there instead.
     const { data: prof } = await supabase
       .from("profiles")
       .select("role")
@@ -92,7 +106,7 @@ export async function completeGoogleProfileAction(
       next: prof?.role === "seller" ? "/seller/onboarding?step=1" : "/",
     };
   } catch (e) {
-    console.error("[auth] save Google profile details failed", e);
+    console.error("[auth] save profile details failed", e);
     return {
       ok: false,
       error: "We couldn't save your details just now. Please try again.",
@@ -100,14 +114,7 @@ export async function completeGoogleProfileAction(
   }
 }
 
-/**
- * Clear the Supabase session cookie and go home.
- *
- * `src/components/sign-out-button.tsx` is the sign-out control users actually
- * press: it clears the Supabase cookie through `signOutSupabase()` and the
- * Firebase session through `signOut()` from `firebase/auth`. This action
- * remains for server-side callers that only need the Supabase cookie cleared.
- */
+/** Clear the Supabase session cookie and go home. */
 export async function signOutAction(): Promise<void> {
   const supabase = requestClient();
   await supabase.auth.signOut();

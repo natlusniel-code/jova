@@ -2,11 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signOut } from "firebase/auth";
-import { firebaseAuth } from "@/lib/firebase/client";
-import { signOutSupabase } from "@/app/auth/firebase-actions";
+import { signOutAction } from "@/app/auth/actions";
 import { Spinner } from "@/components/ui";
 
+/**
+ * Sign out.
+ *
+ * There is one session now — the Supabase one — so signing out is a single
+ * server action that clears the auth cookies. No second provider to sign out
+ * of, and therefore no way for the two to disagree about whether the user is
+ * still signed in.
+ */
 export function SignOutButton() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -14,9 +20,10 @@ export function SignOutButton() {
   async function handleSignOut() {
     setBusy(true);
     try {
-      await signOutSupabase();
-      await signOut(firebaseAuth);
-    } finally {
+      await signOutAction();
+    } catch {
+      // The action redirects; a throw here means the cookie clear failed.
+      // Still navigate away so the user is not stuck on a signed-in shell.
       router.replace("/auth");
       router.refresh();
     }
@@ -31,7 +38,7 @@ export function SignOutButton() {
       className="nm-btn-ghost px-3.5 py-2 text-[13.5px]"
     >
       {busy ? <Spinner /> : null}
-      {busy ? "Signing out\u2026" : "Sign out"}
+      {busy ? "Signing out…" : "Sign out"}
     </button>
   );
 }
