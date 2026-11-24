@@ -5,9 +5,10 @@ money is released to the seller only when the buyer accepts delivery.
 
 Built with Next.js 15 (App Router), TypeScript, Tailwind and Supabase.
 
-Authentication is **Firebase** (Google, Apple, LinkedIn and email + password).
-The marketplace itself still runs on Supabase; see
-[Authentication](#authentication) for how the two fit together.
+Authentication is **plain email + password**, verified by Supabase against the
+account's existing credential. See [Authentication](#authentication) for the
+two-step sign-in and why the password is checked by the database, not by
+`signInWithPassword`.
 
 ---
 
@@ -36,85 +37,87 @@ without:
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — the public
   Supabase project.
 - `SUPABASE_SERVICE_ROLE_KEY` — server-only. Used by admin actions, the push
-  dispatcher, and the Firebase→Supabase bridge; never expose it to the browser.
-- `NEXT_PUBLIC_FIREBASE_*` — the public Firebase web config. Without it the
-  app still builds and runs, but the auth pages say "sign-in is not
-  configured" instead of offering a form.
-- `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY` —
-  server-only Firebase Admin credentials, used to verify ID tokens. Required
-  for any sign-in to work.
+  dispatcher, and the sign-in path (to call `nm_login` and mint the session);
+  never expose it to the browser.
 - `NEXT_PUBLIC_SITE_URL` — the canonical origin. This is what makes the Open
   Graph image resolve to an absolute URL, so a wrong value here means share
-  previews break even though the site works. It is also the origin that must
-  be listed in Firebase's Authorized domains for OAuth to return.
+  previews break even though the site works.
 
 ---
 
 ## Authentication
 
-Firebase is the identity provider. Supabase is still the application database
-and still issues the session cookie every page reads. There is no Clerk in this
-app: the `@clerk/nextjs` dependency and every Clerk route were removed.
+Plain email + password. Supabase holds both the users and the session cookie
+every page reads. There is no Firebase and no Clerk in this app: both SDKs, all
+their routes, and every provider env var were removed on this branch.
 
 ### How a sign-in works
 
-1. The person picks a method on `/auth` (login) or `/signup` (create account):
-   Google, Apple, LinkedIn, or email + password.
-2. Firebase completes the flow in the browser and returns a **Firebase user**
-   with a signed ID token. For OAuth, `signInWithRedirect` returns to `/auth`
-   itself, where `getRedirectResult()` finishes the handshake — there is no
-   separate callback route.
-3. The browser calls `bridgeFirebaseSession` (`src/app/auth/firebase-actions.ts`
-   → `src/lib/firebase/bridge.ts`) with that ID token. The action verifies the
-   token **on the server** with the Firebase Admin SDK, finds or creates the
-   matching Supabase user **by verified email**, and mints a **Supabase**
-   session cookie.
-4. The bridge confirms the session exists before returning, then the browser
-   does a full document navigation (`window.location.assign`) so the next
-   request reads the new cookie. From there the marketplace behaves exactly as
-   before — same cookies, same RLS policies, same role routing.
+1. The person enters an email and a password on `/auth` (login) or `/signup`
+   (create account).
+2. The form calls a **Server Action** (`src/app/auth/actions.ts`), not the
+   browser Supabase client.
+3. The action checks the password with `nm_login(email, password)`
+   (`sql/0015_local_auth.sql`). That function compares the bcrypt hash in
+   `public.account_credentials`, enforces the lockout counter, and returns the
+   user id and role. It is `EXECUTE`-revoked from `anon`/`authenticated`, so it
+   can only be called server-side with the service-role key — it is not a
+   password oracle.
+4. The action mints a **Supabase session** for that same user id
+   (`mintSession`: admin `generateLink` → `verifyOtp`), which writes the
+   `sb-…-auth-token` cookies onto the action's own response.
+5. The action re-reads `getUser()` and refuses to redirect unless the session is
+   readable AND belongs to the same user id whose password was checked. A
+   failure is shown on the form; it never bounces the person back to `/auth`.
+6. The browser navigates to the role-based destination and refreshes.
 
-The bridge is the only place a Jova session can start, and it is why the app
-did not need rewriting when the provider changed.
+### Why not `supabase.auth.signInWithPassword`?
 
-### Existing Appwrite users
+Because it rejects passwords the user actually has. Measured on the live
+project with a real account: `bcrypt.compare` of the user's password against
+`auth.users.encrypted_password` is **false**, while the same comparison against
+`account_credentials.password_hash` is **true**. Jova's accounts were created by
+the local-credentials flow, so `encrypted_password` holds a random Supabase-minted
+hash the user has never known. The credential table is the real password store.
 
-Every account created before this migration signed up through Appwrite with
-Google. Those people have a Supabase row keyed on their Google email and no
-Firebase identity at all. They are not locked out: signing in with the same
-Google account produces a verified email, and the bridge matches them to their
-**existing** Supabase account by that email, so their profile, role, orders and
-chats are all intact. A verified email that already belongs to an account is
-never used to create a second one.
+### Destinations after auth
 
-### Firebase console setup (one-time)
+- buyer → storefront `/`
+- buyer who still needs a phone + LGA → `/signup/complete`
+- seller with a shop → the onboarding step they are on, or `/seller` once approved
+- seller with no shop → `/seller/onboarding?step=1`
+- admin → the admin console
+- an explicit, safe `?next=` always wins (`src/lib/safe-next.ts`)
 
-These are dashboard steps, not environment variables:
+### Supabase dashboard settings
 
-| Where | What |
+| Setting | Value |
 | --- | --- |
-| Authentication → Sign-in method | Enable Google, Apple, LinkedIn and Email/Password |
-| Authentication → Settings → Authorized domains | Add the production domain and every preview domain you sign in from |
-| Authentication → Templates | Set the sender name to **Jova** and write the verification / reset messages |
-| Authentication → Templates → SMTP settings | Optional, needs a plan: send from `no-reply@naijamart.ng` instead of Firebase's shared sender |
+| Authentication → Providers → Email | Enabled (this is the only provider in use) |
+| Authentication → Settings | Email confirmation may stay off; the app creates accounts already confirmed |
+| SQL editor | `sql/0015_local_auth.sql` must be applied — `nm_login` / `nm_set_password` are the password store |
 
 ### Where the code lives
 
 | File | Role |
 | --- | --- |
-| `src/lib/firebase/client.ts` | Browser SDK init (public config) |
-| `src/lib/firebase/admin.ts` | Server-only Admin SDK, used to verify ID tokens |
-| `src/lib/firebase/bridge.ts` | Firebase identity → Supabase user (find or create by verified email) |
-| `src/app/auth/firebase-actions.ts` | The server action that mints the Supabase session, and sign-out |
-| `src/components/firebase-auth-panel.tsx` | The auth UI — providers, password, redirect result |
+| `src/lib/auth/password.ts` | The sign-in and sign-up logic: `nm_login` check → `mintSession` → destination |
+| `src/app/auth/actions.ts` | Server actions the forms call (`signInAction`, `signUpAction`, `completeProfileAction`, `signOutAction`) |
+| `src/lib/auth/local.ts` | `mintSession` (verified identity → Supabase session) and `requestClient` |
+| `src/lib/auth/landing.ts` | Role-based destination for an already-signed-in visitor |
+| `src/lib/post-auth.ts` | Role-based destination after a sign-in or sign-up |
+| `src/lib/safe-next.ts` | The one place that validates `?next=` |
+| `src/components/signin-form.tsx` | Sign-in form |
+| `src/components/signup-form.tsx` | Sign-up form (role, name, email, password) |
 | `src/app/auth/page.tsx` | Login page; redirects an already-signed-in person to their destination |
-| `src/app/auth/continue/page.tsx` | Legacy entry point, now a redirect to `/auth` |
+| `src/app/signup/page.tsx` | Registration page |
+| `src/app/signup/complete/page.tsx` | Buyer's phone + LGA step |
 | `src/middleware.ts` | Supabase session refresh + admin gate |
 
 ### SDK versions
 
-`firebase` **12.5.0**, `firebase-admin` **13.5.0** and `next` **15.5.29**, all
-pinned exactly.
+`next` **15.5.29** is pinned exactly. There is no auth SDK dependency: sign-in
+goes through Supabase over HTTP, so there is no client SDK to drift.
 
 Two consequences worth knowing before editing:
 
