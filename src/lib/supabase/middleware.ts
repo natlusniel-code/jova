@@ -8,7 +8,7 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 /**
  * Refreshes the Supabase auth session on every request.
  *
- * ── THE BUG THIS FILE USED TO HAVE is the root cause of the redirect loop ──
+ * -- THE BUG THIS FILE USED TO HAVE (root cause of the redirect loop) ---------
  * The old `setAll` did this:
  *
  *     const requestHeaders = new Headers(request.headers);   // snapshot, taken
@@ -16,24 +16,24 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
  *     ...
  *     setAll(cookiesToSet) {
  *       cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
- *       response = NextResponse.next({ request: { headers: requestHeaders } }); // ← STALE
+ *       response = NextResponse.next({ request: { headers: requestHeaders } }); // <- STALE
  *       cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(...));
  *     }
  *
- * `request.cookies.set()` DOES mutate `request.headers` — but `requestHeaders`
+ * `request.cookies.set()` DOES mutate `request.headers` - but `requestHeaders`
  * is a *copy* made before that happened. So the rotated token was written to
  * the browser (Set-Cookie on the response) while the request forwarded to the
- * Server Components still carried the OLD Cookie header. On the very request
+ * Server Components still carried the OLD cookie header. On the very request
  * where the token was refreshed, every downstream `getSession()` read the
  * expired token, found no user, and redirected to `/auth`.
  *
- * That is why the symptom survived the Clerk → Firebase swap: this file is
+ * That is why the symptom survived the Clerk -> Firebase swap: this file is
  * provider-agnostic. It was never Firebase's fault.
  *
- * Reproduced in a minimal Next 15 app: with the stale snapshot the page sae
- * `cookie=STALE`�; passing the mutated `request` it saw `cookie=ROTATED`.
+ * Reproduced in a minimal Next 15 app: with the stale snapshot the page saw
+ * `cookie=STALE`; passing the mutated `request it saw `cookie=ROTATED`.
  *
- * ── The fix ─────────────────────────────────────────────────────────────────
+ * -- The fix ------------------------------------------------------------------
  * Pass the live `request` object to `NextResponse.next({ request })`. Next
  * reads `request.headers` at that moment, which already includes the cookies
  * `request.cookies.set()` just wrote. The browser and the Server Components
@@ -47,8 +47,8 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
  *     compiles `undefined` into the bundle and `createServerClient` throws.
  *
  *  2. The whole thing is wrapped in try/catch. Middleware runs in front of
- *     every route, so any unhandled throw — a bad env var, a network blip, a
- *     malformed cookie — turns into a 500 for the entire site. A failed session
+ *     every route, so any unhandled throw - a bad env var, a network blip, a
+ *     malformed cookie - turns into a 500 for the entire site. A failed session
  *     refresh must degrade to "anonymous visitor", never to a dead site.
  */
 export async function updateSession(
@@ -60,7 +60,7 @@ export async function updateSession(
 ) {
   const cid = newCorrelationId();
 
-  // ── Expose the pathname to Server Components ──────────────────────────────
+  // -- Expose the pathname to Server Components ------------------------------
   // A layout cannot read the current URL, but the seller/storefront split
   // needs to know which page is being rendered: a seller is allowed on their
   // own public shop page and on an order detail, and redirected everywhere
@@ -111,7 +111,7 @@ export async function updateSession(
     } = await supabase.auth.getUser();
 
     if (error) {
-      // An expired/absent session is normal for a visitor — log it as a skip,
+      // An expired/absent session is normal for a visitor - log it as a skip,
       // not an error, so real failures stay visible in the log stream.
       authOk("middleware.session", cid, {
         path: request.nextUrl.pathname,
