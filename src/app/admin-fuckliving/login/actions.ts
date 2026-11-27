@@ -2,26 +2,34 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { checkPassword, mintSession } from "@/lib/auth/local";
+import { bridgeClerkSession } from "@/lib/clerk/bridge";
 
 /**
  * Admin sign-in.
  *
- * ── Why a separate action and not `signInAction` ──────────────────────────
+ * ── Why a separate action and not `signInAction` ────────────────────────────
  * The normal sign-in decides where to land from the account's role: a seller
  * goes to the Seller Hub, a buyer to the storefront. An admin must land on the
  * console instead, and a non-admin who tries this page must be sent to the
  * normal home page rather than shown a 404 — the 404 is for the console
  * itself, not for the act of trying to sign in.
  *
- * ── Why Supabase Auth is still underneath ─────────────────────────────────
- * `checkPassword` verifies against `public.account_credentials`, and
- * `mintSession` mints the Supabase session cookie. The identity system is
- * unchanged; this action only adds the admin role check and the destination.
+ * ── Why Clerk is underneath now ─────────────────────────────────────────────
+ * The console used to verify a password against `public.account_credentials`
+ * via `nm_login`. That was a SECOND credential store: a staff member had a
+ * Jova password that Clerk knew nothing about, so a password change in one
+ * place left the other stale, and the console was the one door that bypassed
+ * the identity provider entirely.
  *
- * ── Why the role check is a query ─────────────────────────────────────────
+ * Now the credential check is Clerk's, exactly like the public sign-in, and
+ * this action only adds the admin role check and the destination. There is one
+ * credential store and one place a session is minted.
+ *
+ * ── Why the role check is a query ───────────────────────────────────────────
  * `admin_users` is the same table `is_admin()` reads, so the page, the
  * middleware and the Server Actions all agree on one definition of "admin".
+ * A claim in the token could be stale after a demotion, and `user_metadata` is
+ * client-writable; the row is the truth.
  */
 
 export type AdminLoginResult = { ok: false; error: string } | { ok: true; next: string };
@@ -35,47 +43,39 @@ function safeNext(value: string | null | undefined): string | null {
   return value;
 }
 
+/**
+ * Finish an admin sign-in that Clerk has already completed in the browser.
+ *
+ * The form no longer posts an email and a password: Clerk's component collects
+ * them, so this action receives only the `next` hint. It runs the same bridge
+ * as the public sign-in — one implementation, one session-minting path — and
+ * then decides whether the resulting account may enter the console.
+ */
 export async function adminSignInAction(formData: FormData): Promise<AdminLoginResult> {
-  const email = String(formData.get("email") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
   const next = safeNext(String(formData.get("next") ?? ""));
 
-  if (!email) return { ok: false, error: "Enter your email address." };
-  if (!password) return { ok: false, error: "Enter your password." };
-
-  let userId: string;
-  let resolvedEmail = email;
-
-  try {
-    const verdict = await checkPassword(email, password);
-    if (!verdict.ok) {
-      // Deliberately the same sentence for every failure: an admin login page
-      // must not tell an attacker whether the address exists.
-      return { ok: false, error: "That email and password don't match." };
-    }
-    userId = verdict.userId;
-    resolvedEmail = verdict.email;
-  } catch {
-    return { ok: false, error: "We couldn't sign you in. Please try again." };
-  }
-
-  // Establish the session first, so the role query below runs as this user.
-  try {
-    await mintSession(resolvedEmail);
-  } catch {
-    return { ok: false, error: "We couldn't sign you in. Please try again." };
+  const bridged = await bridgeClerkSession({ mode: "signin", next: null });
+  if (!bridged.ok) {
+    // Deliberately the same sentence for every failure: an admin login page
+    // must not tell an attacker whether the address exists or is staff.
+    return { ok: false, error: "That account can't sign in here." };
   }
 
   // Is this account an admin? The row is the truth.
   let isAdmin = false;
   try {
     const supabase = createClient();
-    const { data } = await supabase
-      .from("admin_users")
-      .select("user_id")
-      .eq("user_id", userId)
-      .maybeSingle();
-    isAdmin = Boolean(data);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase
+        .from("admin_users")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      isAdmin = Boolean(data);
+    }
   } catch {
     isAdmin = false;
   }

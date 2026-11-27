@@ -1,51 +1,69 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { requestClient } from "@/lib/auth/local";
-import {
-  signInWithPassword,
-  signUpWithPassword,
-  type PasswordAuthResult,
-} from "@/lib/auth/password";
+import { bridgeClerkSession, type ClerkBridgeResult } from "@/lib/clerk/bridge";
 
 /**
- * The email + password auth actions.
+ * The auth actions.
  *
- * These are thin wrappers: the work lives in `src/lib/auth/password.ts`, which
- * is the one place a session is established. Keeping the actions thin means
- * there is a single implementation to reason about, and the same functions can
- * be unit-tested without a Next.js request.
+ * ── What changed ─────────────────────────────────────────────────────────────
+ * Clerk now owns the credential check. There is no password to verify here and
+ * no account to create here: the browser completes the Clerk sign-in (its own
+ * component, its own cookie), and these actions do the ONE thing Clerk cannot
+ * do — mint the Supabase session that every RLS policy depends on.
+ *
+ * `signInAction` / `signUpAction` are therefore thin wrappers over
+ * `bridgeClerkSession`, which is the single place a session is established.
+ * Keeping them thin means there is one implementation to reason about, and the
+ * same function can be unit-tested without a Next.js request.
+ *
+ * ── What was removed ────────────────────────────────────────────────────────
+ * `signInWithPassword` / `signUpWithPassword` (src/lib/auth/password.ts) and
+ * the WhatsApp OTP route both wrote credentials into Jova's own store. Clerk is
+ * the credential store now, so both are gone rather than left as dead code that
+ * still looks callable.
  */
 
 export type ActionResult =
   | { ok: true; next?: string }
   | { ok: false; error: string; field?: string };
 
-/** Sign in an existing Supabase account with its email and password. */
+/**
+ * Finish a sign-in that Clerk has already completed in the browser.
+ *
+ * The caller must have an active Clerk session; if it does not, the bridge
+ * returns a real error instead of redirecting, so the form can show it.
+ */
 export async function signInAction(formData: FormData): Promise<ActionResult> {
-  const email = String(formData.get("email") ?? "");
-  const password = String(formData.get("password") ?? "");
   const next = formData.get("next") ? String(formData.get("next")) : null;
 
-  const result: PasswordAuthResult = await signInWithPassword(email, password, next);
+  const result: ClerkBridgeResult = await bridgeClerkSession({
+    mode: "signin",
+    next,
+  });
+
   return result.ok ? { ok: true, next: result.next } : result;
 }
 
-/** Create an account with an email and password, then sign it in. */
+/**
+ * Finish a sign-up that Clerk has already completed in the browser.
+ *
+ * `role` is the buyer/seller choice from step one of `/signup`. It is written
+ * to `public.profiles` by the bridge, because the role is a marketplace fact,
+ * not an identity fact — Clerk has no business knowing it.
+ */
 export async function signUpAction(formData: FormData): Promise<ActionResult> {
-  const email = String(formData.get("email") ?? "");
-  const password = String(formData.get("password") ?? "");
-  const fullName = String(formData.get("full_name") ?? "");
   const role = String(formData.get("role") ?? "buyer") === "seller" ? "seller" : "buyer";
   const next = formData.get("next") ? String(formData.get("next")) : null;
 
-  const result: PasswordAuthResult = await signUpWithPassword({
-    email,
-    password,
-    fullName,
+  const result: ClerkBridgeResult = await bridgeClerkSession({
+    mode: "signup",
     role,
     next,
   });
+
   return result.ok ? { ok: true, next: result.next } : result;
 }
 
@@ -114,9 +132,35 @@ export async function completeProfileAction(formData: FormData): Promise<ActionR
   }
 }
 
-/** Clear the Supabase session cookie and go home. */
+/**
+ * Sign out of BOTH sessions.
+ *
+ * There are two now, and they must be cleared together: the Supabase session
+ * (which every query uses) and the Clerk session (which is the identity). If
+ * only one is cleared the person appears signed out but still holds a valid
+ * identity, and the next page load silently re-mints a Supabase session for
+ * them — the exact "sign out did nothing" bug.
+ */
 export async function signOutAction(): Promise<void> {
   const supabase = requestClient();
-  await supabase.auth.signOut();
+  try {
+    await supabase.auth.signOut();
+  } catch {
+    /* the cookie is cleared by the redirect either way */
+  }
+
+  try {
+    const { userId } = await auth();
+    if (userId) {
+      const client = await clerkClient();
+      // Revoke the Clerk session server-side, not just the browser cookie.
+      await client.sessions.revokeSession(
+        (await auth()).sessionId as string,
+      );
+    }
+  } catch {
+    /* Clerk's own sign-out in the client component clears its cookie */
+  }
+
   redirect("/");
 }

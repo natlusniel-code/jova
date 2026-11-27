@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { updateSession } from "@/lib/supabase/middleware";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
@@ -18,43 +19,59 @@ const ADMIN_ROOT = "/admin-fuckliving";
 const ADMIN_LOGIN = "/admin-fuckliving/login";
 
 /**
+ * Routes that must be reachable without a Clerk session.
+ *
+ * Clerk's own handshake endpoints are matched by `clerkMiddleware` itself; this
+ * list is the app's public surface. Everything else is still public by default
+ * — the marketplace is browsable — so this matcher exists only to keep the
+ * sign-in pages and the admin login out of any future "require auth" rule.
+ */
+const isPublicRoute = createRouteMatcher([
+  "/",
+  "/auth(.*)",
+  "/signin(.*)",
+  "/signup(.*)",
+  "/admin-fuckliving/login(.*)",
+  "/api/auth(.*)",
+  "/api/jobs(.*)",
+  "/api/push(.*)",
+  "/legal(.*)",
+]);
+
+/**
  * The request work that does not belong to the identity provider.
  *
  * Two jobs, in this order:
  *
- *  1. Refresh the Supabase session on every request (the existing behaviour,
- *     unchanged — it degrades to "anonymous" rather than 500-ing the site).
+ *  1. Refresh the Supabase session on every request (unchanged — it degrades to
+ *     "anonymous" rather than 500-ing the site).
  *  2. Gate the admin console.
  *
- * This is pulled out of `middleware` so the admin gate can be reasoned about
- * (and tested) on its own, separate from the session refresh. See `middleware`
- * at the bottom.
+ * ── Why the Supabase refresh is still here ───────────────────────────────────
+ * Clerk owns the identity, but the DATA session is still Supabase's: every RLS
+ * policy reads `auth.uid()`. `updateSession` is what rotates the
+ * `sb-…-auth-token` cookie so a long-lived tab does not silently lose its
+ * database access. It is provider-agnostic and was never Clerk's or Firebase's
+ * business — removing it would break every query in the app.
  *
- * ── Why the admin gate lives here ──────────────────────────────────────────
+ * ── Why the admin gate lives here ────────────────────────────────────────────
  * The console used to have no gate at all: the layout said so explicitly, on
  * the theory that server-side data fetching with the service-role key made it
  * safe. It does not. The key protects the transport, not the endpoint — any
  * visitor who knew the URL could open the dashboard and, through the Server
  * Actions, verify payments and release payouts.
  *
- * ── Why a non-admin gets a 404 and not a redirect ──────────────────────────
+ * ── Why a non-admin gets a 404 and not a redirect ────────────────────────────
  * A redirect to the login page would confirm that the console exists and that
  * the account simply lacks the role. A 404 says nothing: to a non-admin the
  * path is indistinguishable from a typo. The login page itself is exempt, so
  * an admin can still get in.
  *
- * ── Why the admin check is a query and not a JWT claim ─────────────────────
- * `is_admin()` reads `public.admin_users`. A claim in the token could be
- * stale after a demotion, and `user_metadata` is client-writable. The row is
- * the truth, so the row is what is read. The `admin_users_self` RLS policy
- * lets a signed-in user select their own row, which is exactly this query.
- *
- * ── Why the admin gate does NOT read a token claim ─────────────────────────
- * Admin status lives in `public.admin_users`, keyed on the Supabase user id,
- * and is granted there. So the gate reads the Supabase session and the
- * `admin_users` row. Reading it from a token claim instead would move the
- * source of truth for a security decision into the token, where a demotion
- * would not take effect until the next refresh.
+ * ── Why the admin check is a query and not a JWT claim ───────────────────────
+ * `is_admin()` reads `public.admin_users`. A claim in the token could be stale
+ * after a demotion, and `user_metadata` is client-writable. The row is the
+ * truth, so the row is what is read. The `admin_users_self` RLS policy lets a
+ * signed-in user select their own row, which is exactly this query.
  */
 async function handleRequest(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
@@ -87,7 +104,7 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
       data: { user },
     } = await supabase.auth.getUser();
 
-    // No session at all → the admin login page.
+    // No Supabase session at all → the admin login page.
     if (!user) {
       const url = request.nextUrl.clone();
       url.pathname = ADMIN_LOGIN;
@@ -124,15 +141,32 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
 }
 
 /**
- * Supabase is the only auth authority: it holds the session cookie and the
- * user records. Its refresh and admin gate run for every matched request.
+ * Clerk is the identity authority; Supabase is the data authority.
+ *
+ * `clerkMiddleware` runs the Clerk handshake and makes `auth()` available to
+ * Server Components. The app's own work (Supabase refresh + admin gate) runs
+ * inside it, so both happen on every matched request and the admin gate still
+ * sees the rotated Supabase cookies.
  */
-export async function middleware(request: NextRequest) {
+export default clerkMiddleware(async (auth, request) => {
+  // Keep the public surface public. The marketplace is browsable by design;
+  // this guard exists so a future "protect everything" rule cannot lock out
+  // the sign-in pages themselves.
+  if (!isPublicRoute(request)) {
+    // Not a hard gate: the app's own layouts decide what a signed-out visitor
+    // may see. This only ensures Clerk has resolved the session before the
+    // page renders, so `auth()` is never empty on a protected page.
+    await auth();
+  }
+
   return handleRequest(request);
-}
+});
 
 export const config = {
   matcher: [
+    // Skip Next internals and static files, but always run on API routes.
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Clerk's own handshake endpoints.
+    "/(api|trpc)(.*)",
   ],
 };

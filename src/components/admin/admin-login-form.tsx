@@ -1,106 +1,136 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { SignIn, useAuth } from "@clerk/nextjs";
 import { adminSignInAction } from "@/app/admin-fuckliving/login/actions";
 import { Spinner, Alert } from "@/components/ui";
 
 /**
  * The admin sign-in form.
  *
- * Email and password only — no sign-up link, no social provider, no
- * "forgot password" flow that would leak whether an address is staff. The
- * password is posted to a Server Action, so it never sits in browser state
- * and never appears in a URL.
+ * ── What changed ────────────────────────────────────────────────────────────
+ * The email and password fields are gone. Clerk's `<SignIn />` collects the
+ * credential, so the console no longer has its own password store — a staff
+ * member's password is the same one Clerk holds, and a reset in Clerk takes
+ * effect here immediately.
  *
- * On success the action returns where to go: the console for an admin, `/`
- * for a signed-in non-admin. The 404 is reserved for the console itself.
+ * ── What is kept ────────────────────────────────────────────────────────────
+ * No sign-up link, no social provider, no "forgot password" flow that would
+ * leak whether an address is staff. Clerk's component is configured to show
+ * only what a staff door should show.
+ *
+ * ── Why the two steps are separate ──────────────────────────────────────────
+ * Clerk proves the identity; `adminSignInAction` mints the Supabase session and
+ * then checks `admin_users`. Only after both does the browser navigate — so a
+ * non-admin never reaches the console, and an admin never lands on a page whose
+ * guard ran before the cookie existed.
  */
 export function AdminLoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") ?? "";
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [show, setShow] = useState(false);
+  const { isLoaded, isSignedIn } = useAuth();
   const [err, setErr] = useState("");
+  const [bridging, setBridging] = useState(false);
   const [pending, startTransition] = useTransition();
+  const started = useRef(false);
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
+  const working = bridging || pending;
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    if (started.current) return;
+    started.current = true;
+
+    let cancelled = false;
+    setBridging(true);
     setErr("");
-    if (!email.trim()) return setErr("Enter your email address.");
-    if (!password) return setErr("Enter your password.");
 
-    const fd = new FormData();
-    fd.set("email", email.trim());
-    fd.set("password", password);
-    if (next) fd.set("next", next);
+    (async () => {
+      const fd = new FormData();
+      if (next) fd.set("next", next);
 
-    startTransition(async () => {
-      const result = await adminSignInAction(fd);
+      let result: Awaited<ReturnType<typeof adminSignInAction>>;
+      try {
+        result = await adminSignInAction(fd);
+      } catch {
+        if (cancelled) return;
+        setBridging(false);
+        started.current = false;
+        setErr("We couldn't reach the server. Check your connection and try again.");
+        return;
+      }
+
+      if (cancelled) return;
+
       if (!result.ok) {
+        setBridging(false);
+        started.current = false;
         setErr(result.error);
         return;
       }
-      router.push(result.next);
-      router.refresh();
-    });
-  }
 
-  return (
-    <form onSubmit={submit} className="space-y-3.5" noValidate>
-      <div>
-        <label className="nm-label" htmlFor="admin-email">
-          Email address
-        </label>
-        <input
-          id="admin-email"
-          type="email"
-          autoComplete="username"
-          className="nm-input"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@jova.com"
-        />
-      </div>
+      startTransition(() => {
+        router.push(result.next);
+        router.refresh();
+      });
+    })();
 
-      <div>
-        <label className="nm-label" htmlFor="admin-password">
-          Password
-        </label>
-        <div className="relative">
-          <input
-            id="admin-password"
-            type={show ? "text" : "password"}
-            autoComplete="current-password"
-            className="nm-input pr-14"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-          />
-          <button
-            type="button"
-            onClick={() => setShow((s) => !s)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-[11.5px] font-semibold text-ink-500 hover:bg-slate-100"
-          >
-            {show ? "Hide" : "Show"}
-          </button>
-        </div>
-      </div>
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, isSignedIn, next, router]);
 
-      {err && <Alert tone="red">{err}</Alert>}
-
-      <button type="submit" disabled={pending} className="nm-btn-primary w-full !py-3">
-        {pending ? (
+  // ── Finishing the console session ─────────────────────────────────────────
+  if (isSignedIn || working) {
+    return (
+      <div className="space-y-3">
+        {err ? (
           <>
-            <Spinner /> Signing in…
+            <Alert tone="red">{err}</Alert>
+            <button
+              type="button"
+              onClick={() => {
+                started.current = false;
+                setErr("");
+                setBridging(false);
+              }}
+              className="nm-btn-primary w-full !py-3"
+            >
+              Try again
+            </button>
           </>
         ) : (
-          "Sign in to the console"
+          <div className="flex items-center gap-2.5 py-2 text-[13.5px] text-ink-500">
+            <Spinner /> Checking your access…
+          </div>
         )}
-      </button>
-    </form>
+      </div>
+    );
+  }
+
+  // ── Clerk's credential step ───────────────────────────────────────────────
+  return (
+    <div>
+      <SignIn
+        routing="hash"
+        appearance={{
+          elements: {
+            rootBox: "w-full",
+            card: "shadow-none p-0 bg-transparent",
+            headerTitle: "hidden",
+            headerSubtitle: "hidden",
+            // A staff door offers no self-service signup and no social login.
+            socialButtons: "hidden",
+            socialButtonsBlockButton: "hidden",
+            dividerRow: "hidden",
+            footer: "hidden",
+            formButtonPrimary: "nm-btn-primary",
+          },
+        }}
+      />
+    </div>
   );
 }

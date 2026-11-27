@@ -24,7 +24,7 @@ const FAQ = [
   },
   {
     q: "I forgot my password. How do I get back in?",
-    a: "Message us on WhatsApp with the email address on your account and we'll verify you and set a new password. We don't email reset links, so this is the fastest route.",
+    a: "Use the \"Forgot password?\" link on the sign-in page. We'll email you a reset link — no need to message us.",
   },
   {
     q: "My order never arrived. What now?",

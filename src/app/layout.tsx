@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { headers } from "next/headers";
+import { ClerkProvider } from "@clerk/nextjs";
 import { INSTALL_CAPTURE_SCRIPT } from "@/lib/install-capture";
 import { GlobalLoader } from "@/components/global-loader";
 import { GlobalLoaderTriggers } from "@/components/global-loader-triggers";
@@ -21,7 +22,7 @@ import "./reference.css";
 /**
  * The absolute origin this page is being served from.
  *
- * ── Why this reads the request instead of an env var ───────────────────────
+ * ── Why this reads the request instead of an env var ─────────────────────────
  * The share card showed an empty image slot, and the cause was not the tags:
  * `og:image` pointed at `https://jova.ng/og-image.jpg`, and `jova.ng` has no
  * DNS record at all. Both `NEXT_PUBLIC_SITE_URL` and Vercel's own
@@ -151,17 +152,18 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // ── Why there is no auth provider here ─────────────────────────────────────
-  // There is exactly one auth SDK in this app: Supabase. Clerk and Firebase
-  // are both gone. Mounting a second provider kept a competing session alive
-  // in the browser — it booted its own session, wrote its own cookies, and its
-  // `signInUrl` / `afterSignOutUrl` pointed at `/auth`. That is a second
-  // redirect authority in an app that must have exactly one.
+  // ── Why ClerkProvider is here ───────────────────────────────────────────────
+  // Clerk is the identity provider: it owns the sign-in UI, the session cookie
+  // and the social connections. Supabase is still the DATA authority — every
+  // table is protected by RLS keyed on `auth.uid()` — and the two are joined by
+  // `src/lib/clerk/bridge.ts`, which mints a Supabase session for the Clerk
+  // identity. So there is one identity authority (Clerk) and one data authority
+  // (Supabase), and exactly one place that converts between them.
   //
-  // Removing it also removes a build-time hazard: a provider that throws at
-  // render when it has no publishable key would take the whole site down on
-  // any host without the variable.
+  // `signInUrl` / `signUpUrl` point at the app's own pages, not Clerk's hosted
+  // ones, so the marketplace keeps its own look and its own `?next=` handling.
   return (
+    <ClerkProvider signInUrl="/auth" signUpUrl="/signup" afterSignOutUrl="/">
     <html lang="en">
       <head>
         {/*
@@ -207,5 +209,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
       </body>
     </html>
+    </ClerkProvider>
   );
 }

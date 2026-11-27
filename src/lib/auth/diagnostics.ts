@@ -10,7 +10,7 @@ export { cookieNames, maskEmail };
 /**
  * Structured, correlation-ID auth diagnostics.
  *
- * ── Why this exists ────────────────────────────────────────────────────────
+ * ── Why this exists ──────────────────────────────────────────────────────────
  * The redirect bug survived a whole identity-provider swap because every
  * stage of the sign-in chain failed *silently*: a swallowed cookie write, a
  * `catch {}` with no message, a `getUser()` that returned null and was treated
@@ -25,7 +25,7 @@ export { cookieNames, maskEmail };
  *   → supabase.session.verify → redirect.destination
  *   → middleware.session → page.session
  *
- * ── What is NEVER logged ───────────────────────────────────────────────────
+ * ── What is NEVER logged ─────────────────────────────────────────────────────
  * Passwords, Supabase access/refresh tokens, API keys,
  * service-role keys, and complete cookie values. Cookie NAMES are logged
  * (they are not secret and are what you need to debug a missing cookie);
@@ -33,6 +33,8 @@ export { cookieNames, maskEmail };
  */
 
 export type AuthStage =
+  | "clerk.verify"
+  | "clerk.bridge"
   | "supabase.user.resolve"
   | "supabase.session.mint"
   | "supabase.session.verify"

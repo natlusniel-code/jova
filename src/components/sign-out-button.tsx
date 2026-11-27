@@ -2,19 +2,29 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useClerk } from "@clerk/nextjs";
 import { signOutAction } from "@/app/auth/actions";
 import { Spinner } from "@/components/ui";
 
 /**
  * Sign out.
  *
- * There is one session now — the Supabase one — so signing out is a single
- * server action that clears the auth cookies. No second provider to sign out
- * of, and therefore no way for the two to disagree about whether the user is
- * still signed in.
+ * There are TWO sessions now and they must be cleared together: the Supabase
+ * one (which every query uses) and the Clerk one (which is the identity).
+ *
+ * ── Why the order matters ──────────────────────────────────────────────────
+ * The server action clears the Supabase cookie first, then revokes the Clerk
+ * session. If Clerk were cleared first, the next page load would find a live
+ * Supabase cookie with no Clerk identity behind it — a session nobody can
+ * explain and nobody can revoke. Clearing Supabase first means the worst case
+ * is a Clerk session with no data access, which the next sign-in simply reuses.
+ *
+ * `clerk.signOut()` is also called in the browser so Clerk's own client state
+ * and cookie are dropped even if the server call failed.
  */
 export function SignOutButton() {
   const router = useRouter();
+  const clerk = useClerk();
   const [busy, setBusy] = useState(false);
 
   async function handleSignOut() {
@@ -26,6 +36,14 @@ export function SignOutButton() {
       // Still navigate away so the user is not stuck on a signed-in shell.
       router.replace("/auth");
       router.refresh();
+    } finally {
+      // Drop Clerk's client-side session too. `signOutAction` already revoked
+      // it server-side; this clears the browser's copy.
+      try {
+        await clerk.signOut({ redirectUrl: "/" });
+      } catch {
+        /* already signed out server-side */
+      }
     }
   }
 

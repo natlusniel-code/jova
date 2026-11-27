@@ -15,6 +15,7 @@
     "test:all": "npx --yes tsx@4.19.2 --test tests/auth-lifecycle.test.ts tests/middleware-cookie.test.ts"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.10.6",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
     "clsx": "^2.1.1",

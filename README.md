@@ -5,10 +5,10 @@ money is released to the seller only when the buyer accepts delivery.
 
 Built with Next.js 15 (App Router), TypeScript, Tailwind and Supabase.
 
-Authentication is **plain email + password**, verified by Supabase against the
-account's existing credential. See [Authentication](#authentication) for the
-two-step sign-in and why the password is checked by the database, not by
-`signInWithPassword`.
+Authentication is **Clerk** (identity) bridged to **Supabase** (data). Clerk
+verifies the credential and holds the session cookie; a server-side bridge mints
+the Supabase session that every RLS policy reads `auth.uid()` from. See
+[Authentication](#authentication).
 
 ---
 
@@ -37,8 +37,10 @@ without:
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — the public
   Supabase project.
 - `SUPABASE_SERVICE_ROLE_KEY` — server-only. Used by admin actions, the push
-  dispatcher, and the sign-in path (to call `nm_login` and mint the session);
-  never expose it to the browser.
+  dispatcher, and the auth bridge (to resolve/create the Supabase user and mint
+  the session); never expose it to the browser.
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` — Clerk's keys. The
+  publishable key is public by design; the secret key is server-only.
 - `NEXT_PUBLIC_SITE_URL` — the canonical origin. This is what makes the Open
   Graph image resolve to an absolute URL, so a wrong value here means share
   previews break even though the site works.
@@ -47,38 +49,44 @@ without:
 
 ## Authentication
 
-Plain email + password. Supabase holds both the users and the session cookie
-every page reads. There is no Firebase and no Clerk in this app: both SDKs, all
-their routes, and every provider env var were removed on this branch.
+**Clerk is the identity provider. Supabase is the data authority.** They are
+joined by one file, `src/lib/clerk/bridge.ts`, and that is the only place a
+session is established.
+
+### Why two systems
+
+Clerk owns the credential check, MFA, social connections and the session cookie.
+But every table in this project is protected by RLS keyed on `auth.uid()`, and
+`auth.uid()` is a **Supabase** user id — Clerk's `user_…` id means nothing to
+Postgres. So a Clerk sign-in is not finished when Clerk says it is; it is
+finished when the person also holds a Supabase session whose `auth.uid()` is the
+id their `profiles` row, `shops` row, orders and payouts already point at.
 
 ### How a sign-in works
 
-1. The person enters an email and a password on `/auth` (login) or `/signup`
-   (create account).
-2. The form calls a **Server Action** (`src/app/auth/actions.ts`), not the
-   browser Supabase client.
-3. The action checks the password with `nm_login(email, password)`
-   (`sql/0015_local_auth.sql`). That function compares the bcrypt hash in
-   `public.account_credentials`, enforces the lockout counter, and returns the
-   user id and role. It is `EXECUTE`-revoked from `anon`/`authenticated`, so it
-   can only be called server-side with the service-role key — it is not a
-   password oracle.
-4. The action mints a **Supabase session** for that same user id
-   (`mintSession`: admin `generateLink` → `verifyOtp`), which writes the
+1. The person signs in on `/auth` (login) or `/signup` (create account) using
+   Clerk's own component. Clerk verifies the credential and writes its session
+   cookie.
+2. The form calls a **Server Action** (`src/app/auth/actions.ts`), which calls
+   `bridgeClerkSession`.
+3. The bridge reads the Clerk identity (`auth()` + `clerkClient().users.getUser`)
+   and takes the primary email.
+4. It resolves the ONE Supabase user that owns that email, or creates it on
+   sign-up. An ambiguous email (two profiles) with no session id to disambiguate
+   is **refused**, not guessed — guessing is how a seller lands in a buyer's
+   account.
+5. `mintSession(email)` (admin `generateLink` → `verifyOtp`) writes the
    `sb-…-auth-token` cookies onto the action's own response.
-5. The action re-reads `getUser()` and refuses to redirect unless the session is
-   readable AND belongs to the same user id whose password was checked. A
-   failure is shown on the form; it never bounces the person back to `/auth`.
-6. The browser navigates to the role-based destination and refreshes.
+6. The bridge re-resolves against the id the session actually carries, so the
+   app and the session can never disagree.
+7. The browser navigates to the role-based destination and refreshes.
 
-### Why not `supabase.auth.signInWithPassword`?
+### Why the password is no longer checked by the database
 
-Because it rejects passwords the user actually has. Measured on the live
-project with a real account: `bcrypt.compare` of the user's password against
-`auth.users.encrypted_password` is **false**, while the same comparison against
-`account_credentials.password_hash` is **true**. Jova's accounts were created by
-the local-credentials flow, so `encrypted_password` holds a random Supabase-minted
-hash the user has never known. The credential table is the real password store.
+`nm_login` / `public.account_credentials` were a second credential store. A
+staff member or buyer had a Jova password that Clerk knew nothing about, so a
+reset in one place left the other stale. Clerk is the only credential store now;
+`nm_login` is no longer called by any sign-in path.
 
 ### Destinations after auth
 
@@ -89,35 +97,35 @@ hash the user has never known. The credential table is the real password store.
 - admin → the admin console
 - an explicit, safe `?next=` always wins (`src/lib/safe-next.ts`)
 
-### Supabase dashboard settings
+### Clerk dashboard settings
 
 | Setting | Value |
 | --- | --- |
-| Authentication → Providers → Email | Enabled (this is the only provider in use) |
-| Authentication → Settings | Email confirmation may stay off; the app creates accounts already confirmed |
-| SQL editor | `sql/0015_local_auth.sql` must be applied — `nm_login` / `nm_set_password` are the password store |
+| API Keys | Copy the publishable + secret key into the env |
+| User & Authentication → Email | Enabled (the only strategy in use) |
+| Paths | Sign-in `/auth`, sign-up `/signup`, after sign-out `/` |
 
 ### Where the code lives
 
 | File | Role |
 | --- | --- |
-| `src/lib/auth/password.ts` | The sign-in and sign-up logic: `nm_login` check → `mintSession` → destination |
+| `src/lib/clerk/bridge.ts` | **The bridge.** Clerk identity → Supabase user → `mintSession` → destination |
 | `src/app/auth/actions.ts` | Server actions the forms call (`signInAction`, `signUpAction`, `completeProfileAction`, `signOutAction`) |
 | `src/lib/auth/local.ts` | `mintSession` (verified identity → Supabase session) and `requestClient` |
 | `src/lib/auth/landing.ts` | Role-based destination for an already-signed-in visitor |
 | `src/lib/post-auth.ts` | Role-based destination after a sign-in or sign-up |
 | `src/lib/safe-next.ts` | The one place that validates `?next=` |
-| `src/components/signin-form.tsx` | Sign-in form |
-| `src/components/signup-form.tsx` | Sign-up form (role, name, email, password) |
+| `src/components/signin-form.tsx` | Clerk `<SignIn />` + bridge handoff |
+| `src/components/signup/signup-details.tsx` | Clerk `<SignUp />` + bridge handoff (role carried from step one) |
 | `src/app/auth/page.tsx` | Login page; redirects an already-signed-in person to their destination |
-| `src/app/signup/page.tsx` | Registration page |
+| `src/app/signup/page.tsx` | Registration step one (buyer or seller) |
 | `src/app/signup/complete/page.tsx` | Buyer's phone + LGA step |
-| `src/middleware.ts` | Supabase session refresh + admin gate |
+| `src/middleware.ts` | `clerkMiddleware` + Supabase session refresh + admin gate |
 
 ### SDK versions
 
-`next` **15.5.29** is pinned exactly. There is no auth SDK dependency: sign-in
-goes through Supabase over HTTP, so there is no client SDK to drift.
+`next` **15.5.29** is pinned exactly. `@clerk/nextjs` **^7.10.6** is the only
+auth SDK.
 
 Two consequences worth knowing before editing:
 
