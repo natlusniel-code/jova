@@ -10,7 +10,7 @@ import { Spinner, Alert } from "@/components/ui";
 /**
  * The plain email + password sign-in form.
  *
- * ── Why a server action and not a browser Supabase call ─────────────────────
+ * ── Why a server action and not a browser Supabase call ────────────────
  * The previous version called `supabase.auth.signInWithPassword()` in the
  * browser and then `router.push()`. That is the shape that produced the
  * redirect bug: the navigation could start before the session cookie was
@@ -113,6 +113,12 @@ export function SignInForm({ next }: { next?: string }) {
             <label className="text-[13px] font-semibold text-ink-700" htmlFor="password">
               Password
             </label>
+            <Link
+              href="/help#password"
+              className="text-[12.5px] font-semibold text-brand-600 hover:underline"
+            >
+              Forgot password?
+            </Link>
           </div>
           <div className="relative">
             <input
@@ -169,6 +175,18 @@ export function SignInForm({ next }: { next?: string }) {
         <Link href="/signup" className="font-semibold text-brand-600 hover:underline">
           Create an account
         </Link>
+      </p>
+
+      <p className="mt-6 text-center text-[11.5px] leading-relaxed text-ink-400">
+        By continuing you agree to our{" "}
+        <Link href="/legal/terms" className="underline underline-offset-2 hover:text-ink-700">
+          Terms
+        </Link>{" "}
+        and{" "}
+        <Link href="/legal/refunds" className="underline underline-offset-2 hover:text-ink-700">
+          Refund Policy
+        </Link>
+        .
       </p>
     </div>
   );

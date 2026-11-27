@@ -42,8 +42,8 @@ export function AuthSplit({
   media?: React.ReactNode;
 }) {
   return (
-    <div className="grid min-h-dvh bg-[var(--canvas)] lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden lg:grid-cols-[1.02fr_1fr]">
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-[linear-gradient(150deg,#0a6b3d_0%,#075232_55%,#053f28_100%)] p-9 text-white lg:flex lg:h-[100dvh]">
+    <div className="grid min-h-dvh bg-[var(--canvas)] lg:grid-cols-[1.02fr_1fr]">
+      <aside className="relative hidden flex-col justify-between overflow-hidden bg-[linear-gradient(150deg,#0a6b3d_0%,#075232_55%,#053f28_100%)] p-9 text-white lg:flex">
         <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(620px 320px at 6% -8%, rgba(203,242,107,.20), transparent 62%), radial-gradient(480px 280px at 100% 104%, rgba(79,191,125,.24), transparent 60%)" }} />
         <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.14]" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,.6) 1px, transparent 1px)", backgroundSize: "24px 24px", maskImage: "radial-gradient(70% 60% at 50% 40%, #000, transparent)", WebkitMaskImage: "radial-gradient(70% 60% at 50% 40%, #000, transparent)" }} />
         <div className="relative"><Logo light /></div>
@@ -74,12 +74,12 @@ export function AuthSplit({
         </p>
       </aside>
 
-      <section className="flex min-h-dvh flex-col lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
+      <section className="flex min-h-dvh flex-col bg-white">
         <div className="flex items-center justify-between px-5 py-4 lg:hidden">
           <Logo />
           <Badge tone="green" dot>Escrow protected</Badge>
         </div>
-        {/* ── Why `my-auto` and NOT `items-center` ────────────────────────────
+        {/* ── Why `my-auto` and NOT `items-center` ───────────────────────
             This is the mobile signup bug, and it is subtler than it looks.
 
             A flex container with `items-center` and content TALLER than the
@@ -104,7 +104,7 @@ export function AuthSplit({
             which is what a phone user expects (and what makes the address bar
             collapse). A nested scroll container on mobile traps the gesture
             and is the other half of the "can't reach the button" report. */}
-        <div className="flex min-h-0 flex-1 justify-center px-5 py-2 sm:px-8 lg:overflow-y-auto lg:px-8 lg:py-4">
+        <div className="flex min-h-0 flex-1 justify-center px-5 pb-14 pt-4 sm:px-8 lg:px-8">
           <div className="nm-rise my-auto w-full max-w-[420px]">{children}</div>
         </div>
       </section>

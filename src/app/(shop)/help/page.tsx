@@ -23,6 +23,10 @@ const FAQ = [
     a: "Create an account, choose \"Sell on Jova\", and complete the four-step onboarding. You'll need a valid NIN or CAC number and your bank details for payouts.",
   },
   {
+    q: "I forgot my password. How do I get back in?",
+    a: "Message us on WhatsApp with the email address on your account and we'll verify you and set a new password. We don't email reset links, so this is the fastest route.",
+  },
+  {
     q: "My order never arrived. What now?",
     a: "Open the order and tap \"Raise an issue\". Your money stays in escrow while support reviews it. You can also message us on WhatsApp with the order reference.",
   },
@@ -61,7 +65,7 @@ export default function HelpPage() {
         <p className="text-[13.5px] font-bold text-ink-900">Common questions</p>
         <dl className="mt-4 space-y-4">
           {FAQ.map((item) => (
-            <div key={item.q}>
+            <div key={item.q} id={item.q.startsWith("I forgot") ? "password" : undefined}>
               <dt className="text-[13px] font-semibold text-ink-900">{item.q}</dt>
               <dd className="mt-1 text-[12.5px] leading-relaxed text-ink-500">{item.a}</dd>
             </div>

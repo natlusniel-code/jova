@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 /**
  * The sign-in video.
  *
- * ── Why `muted` is set three ways ─────────────────────────────────────
+ * ── Why `muted` is set three ways ──────────────────────────────────────
  * The requirement is that the video is silent. `muted` as a JSX prop is not
  * enough on its own: React sets the property, but some mobile browsers decide
  * whether autoplay is allowed from the *attribute* at parse time, and a video
@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
  * on a black frame" bug. So the attribute is written in the markup, the
  * property is forced in an effect, and `volume` is pinned to 0.
  *
- * ── Why it is not a background video ─────────────────────────────────
+ * ── Why it is not a background video ───────────────────────────────────
  * A full-bleed video behind a login form is a performance trap: it competes
  * with the form for the main thread on a mid-range Android, and a 2.4 MB file
  * on a 3G connection means the buyer stares at a blank panel while it
@@ -71,10 +71,21 @@ export function SignInVideo({
   }, []);
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-ink-900 shadow-lift">
+    <div
+      className="relative overflow-hidden rounded-2xl bg-ink-900 bg-cover bg-center shadow-lift"
+      style={{ backgroundImage: `url(${poster})` }}
+    >
+      {/* ── Why the poster is also a background layer ───────────────────
+          The `poster` attribute only paints while the <video> element is
+          itself visible. The element starts at `opacity-0` and only fades in
+          on `canplay`, so on a device that cannot decode the file (an old
+          Android, a browser without H.264, a blocked request) the poster was
+          invisible too and the panel was a plain black box. Painting the
+          poster on the container means the frame is always a still of the
+          video, and the video simply fades in over it when it can play. */}
       <video
         ref={ref}
-        className={`w-full object-cover transition-opacity duration-500 ${
+        className={`relative w-full object-cover transition-opacity duration-500 ${
           compact ? "h-[132px]" : "h-40 sm:h-48"
         } ${ready ? "opacity-100" : "opacity-0"}`}
         src={src}
